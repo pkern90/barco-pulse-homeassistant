@@ -2,7 +2,7 @@
 Custom integration to integrate barco_pulse with Home Assistant.
 
 For more details about this integration, please refer to
-https://github.com/ludeeus/integration_blueprint
+https://github.com/pkern90/barco-pulse-homeassistant
 """
 
 from __future__ import annotations
@@ -10,12 +10,11 @@ from __future__ import annotations
 from datetime import timedelta
 from typing import TYPE_CHECKING
 
-from homeassistant.const import CONF_PASSWORD, CONF_USERNAME, Platform
-from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.const import CONF_HOST, Platform
 from homeassistant.loader import async_get_loaded_integration
 
 from .api import BarcoPulseApiClient
-from .const import DOMAIN, LOGGER
+from .const import CONF_AUTH_CODE, CONF_PORT, DEFAULT_PORT, DOMAIN, LOGGER
 from .coordinator import BarcoPulseDataUpdateCoordinator
 from .data import BarcoPulseData
 
@@ -37,18 +36,32 @@ async def async_setup_entry(
     entry: BarcoPulseConfigEntry,
 ) -> bool:
     """Set up this integration using UI."""
+    # Create API client
+    client = BarcoPulseApiClient(
+        host=entry.data[CONF_HOST],
+        port=entry.data.get(CONF_PORT, DEFAULT_PORT),
+        auth_code=entry.data.get(CONF_AUTH_CODE),
+    )
+
+    # Connect to projector
+    try:
+        await client.connect()
+    except Exception as err:  # noqa: BLE001
+        LOGGER.error("Failed to connect to projector: %s", err)
+        return False
+
+    # Create coordinator with 30 second update interval
     coordinator = BarcoPulseDataUpdateCoordinator(
         hass=hass,
         logger=LOGGER,
         name=DOMAIN,
-        update_interval=timedelta(hours=1),
+        update_interval=timedelta(seconds=30),
+        client=client,
     )
+
+    # Store runtime data
     entry.runtime_data = BarcoPulseData(
-        client=BarcoPulseApiClient(
-            username=entry.data[CONF_USERNAME],
-            password=entry.data[CONF_PASSWORD],
-            session=async_get_clientsession(hass),
-        ),
+        client=client,
         integration=async_get_loaded_integration(hass, entry.domain),
         coordinator=coordinator,
     )
@@ -67,6 +80,10 @@ async def async_unload_entry(
     entry: BarcoPulseConfigEntry,
 ) -> bool:
     """Handle removal of an entry."""
+    # Disconnect from projector
+    if entry.runtime_data.client.is_connected:
+        await entry.runtime_data.client.disconnect()
+
     return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
 
 

@@ -4,18 +4,16 @@ from __future__ import annotations
 
 import voluptuous as vol
 from homeassistant import config_entries
-from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
+from homeassistant.const import CONF_HOST
 from homeassistant.helpers import selector
-from homeassistant.helpers.aiohttp_client import async_create_clientsession
-from slugify import slugify
 
 from .api import (
     BarcoPulseApiClient,
-    BarcoPulseApiClientAuthenticationError,
-    BarcoPulseApiClientCommunicationError,
-    BarcoPulseApiClientError,
+    BarcoPulseApiError,
+    BarcoPulseAuthenticationError,
+    BarcoPulseConnectionError,
 )
-from .const import DOMAIN, LOGGER
+from .const import CONF_AUTH_CODE, CONF_PORT, DEFAULT_PORT, DOMAIN, LOGGER
 
 
 class BarcoPulseFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
@@ -31,29 +29,32 @@ class BarcoPulseFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
         _errors = {}
         if user_input is not None:
             try:
-                await self._test_credentials(
-                    username=user_input[CONF_USERNAME],
-                    password=user_input[CONF_PASSWORD],
+                # Get system info to validate connection and get serial number
+                info = await self._test_connection(
+                    host=user_input[CONF_HOST],
+                    port=user_input.get(CONF_PORT, DEFAULT_PORT),
+                    auth_code=user_input.get(CONF_AUTH_CODE),
                 )
-            except BarcoPulseApiClientAuthenticationError as exception:
+            except BarcoPulseAuthenticationError as exception:
                 LOGGER.warning(exception)
                 _errors["base"] = "auth"
-            except BarcoPulseApiClientCommunicationError as exception:
+            except BarcoPulseConnectionError as exception:
                 LOGGER.error(exception)
                 _errors["base"] = "connection"
-            except BarcoPulseApiClientError as exception:
+            except BarcoPulseApiError as exception:
                 LOGGER.exception(exception)
                 _errors["base"] = "unknown"
             else:
-                await self.async_set_unique_id(
-                    ## Do NOT use this in production code
-                    ## The unique_id should never be something that can change
-                    ## https://developers.home-assistant.io/docs/config_entries_config_flow_handler#unique-ids
-                    unique_id=slugify(user_input[CONF_USERNAME])
-                )
-                self._abort_if_unique_id_configured()
+                # Use serial number as unique ID
+                serial_number = info.get("serial_number", "")
+                if serial_number:
+                    await self.async_set_unique_id(serial_number)
+                    self._abort_if_unique_id_configured()
+
+                # Use model name + serial for title
+                title = f"{info.get('model_name', 'Barco Pulse')} ({serial_number})"
                 return self.async_create_entry(
-                    title=user_input[CONF_USERNAME],
+                    title=title,
                     data=user_input,
                 )
 
@@ -62,16 +63,31 @@ class BarcoPulseFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
             data_schema=vol.Schema(
                 {
                     vol.Required(
-                        CONF_USERNAME,
-                        default=(user_input or {}).get(CONF_USERNAME, vol.UNDEFINED),
+                        CONF_HOST,
+                        default=(user_input or {}).get(CONF_HOST, vol.UNDEFINED),
                     ): selector.TextSelector(
                         selector.TextSelectorConfig(
                             type=selector.TextSelectorType.TEXT,
                         ),
                     ),
-                    vol.Required(CONF_PASSWORD): selector.TextSelector(
-                        selector.TextSelectorConfig(
-                            type=selector.TextSelectorType.PASSWORD,
+                    vol.Optional(
+                        CONF_PORT,
+                        default=(user_input or {}).get(CONF_PORT, DEFAULT_PORT),
+                    ): selector.NumberSelector(
+                        selector.NumberSelectorConfig(
+                            min=1,
+                            max=65535,
+                            mode=selector.NumberSelectorMode.BOX,
+                        ),
+                    ),
+                    vol.Optional(
+                        CONF_AUTH_CODE,
+                        default=(user_input or {}).get(CONF_AUTH_CODE, vol.UNDEFINED),
+                    ): selector.NumberSelector(
+                        selector.NumberSelectorConfig(
+                            min=10000,
+                            max=99999,
+                            mode=selector.NumberSelectorMode.BOX,
                         ),
                     ),
                 },
@@ -79,11 +95,17 @@ class BarcoPulseFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
             errors=_errors,
         )
 
-    async def _test_credentials(self, username: str, password: str) -> None:
-        """Validate credentials."""
+    async def _test_connection(
+        self, host: str, port: int, auth_code: int | None
+    ) -> dict:
+        """Validate connection and return system info."""
         client = BarcoPulseApiClient(
-            username=username,
-            password=password,
-            session=async_create_clientsession(self.hass),
+            host=host,
+            port=port,
+            auth_code=auth_code,
         )
-        await client.async_get_data()
+        try:
+            await client.connect()
+            return await client.get_system_info()
+        finally:
+            await client.disconnect()
