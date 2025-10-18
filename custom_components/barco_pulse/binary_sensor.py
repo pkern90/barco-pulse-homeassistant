@@ -21,9 +21,10 @@ if TYPE_CHECKING:
 
 ENTITY_DESCRIPTIONS = (
     BinarySensorEntityDescription(
-        key="barco_pulse",
-        name="Barco Pulse Binary Sensor",
-        device_class=BinarySensorDeviceClass.CONNECTIVITY,
+        key="power_status",
+        name="Power Status",
+        device_class=BinarySensorDeviceClass.POWER,
+        icon="mdi:power",
     ),
 )
 
@@ -58,4 +59,4 @@ class BarcoPulseBinarySensor(BarcoPulseEntity, BinarySensorEntity):
     @property
     def is_on(self) -> bool:
         """Return true if the binary_sensor is on."""
-        return self.coordinator.data.get("title", "") == "foo"
+        return self.coordinator.data.get("power", {}).get("is_on", False)

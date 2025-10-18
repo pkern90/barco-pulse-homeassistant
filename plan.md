@@ -169,12 +169,14 @@ class BarcoPulseCommandError(BarcoPulseApiError): pass
 
 ### 3.2 Implementation Tasks
 
-- [ ] Update `_async_update_data()` to fetch properties from API client
-- [ ] Call `get_system_state()`, `get_system_info()`, `get_active_source()`, `list_sources()`, `get_laser_power()`
-- [ ] Build coordinator data dict with fetched values
-- [ ] Derive `power.is_on` from `system.state`
-- [ ] Map API exceptions to `UpdateFailed` or `ConfigEntryAuthFailed`
-- [ ] Set update interval: 30 seconds for MVP (adjust later based on state)
+- [x] Update `_async_update_data()` to fetch properties from API client
+- [x] Call `get_system_state()`, `get_system_info()`, `get_active_source()`, `list_sources()`, `get_laser_power()`
+- [x] Build coordinator data dict with fetched values
+- [x] Derive `power.is_on` from `system.state`
+- [x] Map API exceptions to `UpdateFailed` or `ConfigEntryAuthFailed`
+- [x] Set update interval: 30 seconds for MVP (adjust later based on state)
+
+**Status:** ✅ **COMPLETED** (implemented in Phase 2)
 
 ---
 
@@ -191,10 +193,10 @@ class BarcoPulseCommandError(BarcoPulseApiError): pass
 - `firmware_version`: Firmware Version
 
 **Tasks:**
-- [ ] Define `ENTITY_DESCRIPTIONS` with `SensorEntityDescription`
-- [ ] Implement `BarcoPulseSensor` class
-- [ ] Map `coordinator.data` to `native_value`
-- [ ] Set device class, units, icons
+- [x] Define `ENTITY_DESCRIPTIONS` with `SensorEntityDescription`
+- [x] Implement `BarcoPulseSensor` class
+- [x] Map `coordinator.data` to `native_value`
+- [x] Set device class, units, icons
 
 ### 4.2 Switches
 
@@ -204,12 +206,12 @@ class BarcoPulseCommandError(BarcoPulseApiError): pass
 - `power`: Power switch (turn projector on/off)
 
 **Tasks:**
-- [ ] Define `ENTITY_DESCRIPTIONS`
-- [ ] Implement `BarcoPulseSwitch` class
-- [ ] `is_on` from `coordinator.data["power"]["is_on"]`
-- [ ] `async_turn_on()`: call `client.power_on()`, then `coordinator.async_request_refresh()`
-- [ ] `async_turn_off()`: call `client.power_off()`, then refresh
-- [ ] Handle state validation (don't turn on if already on)
+- [x] Define `ENTITY_DESCRIPTIONS`
+- [x] Implement `BarcoPulseSwitch` class
+- [x] `is_on` from `coordinator.data["power"]["is_on"]`
+- [x] `async_turn_on()`: call `client.power_on()`, then `coordinator.async_request_refresh()`
+- [x] `async_turn_off()`: call `client.power_off()`, then refresh
+- [x] Handle state validation (projector handles this internally)
 
 ### 4.3 Binary Sensors
 
@@ -219,9 +221,11 @@ class BarcoPulseCommandError(BarcoPulseApiError): pass
 - `power_status`: Is projector powered on (device class: power)
 
 **Tasks:**
-- [ ] Define `ENTITY_DESCRIPTIONS`
-- [ ] Implement `BarcoPulseBinarySensor`
-- [ ] Map `coordinator.data` to `is_on`
+- [x] Define `ENTITY_DESCRIPTIONS`
+- [x] Implement `BarcoPulseBinarySensor`
+- [x] Map `coordinator.data` to `is_on`
+
+**Status:** ✅ **COMPLETED**
 
 ---
 
@@ -238,12 +242,14 @@ class BarcoPulseCommandError(BarcoPulseApiError): pass
 - Projector name (friendly name) - optional
 
 **Tasks:**
-- [ ] Update `STEP_USER_DATA_SCHEMA` with new fields (host, port, auth_code, name)
-- [ ] Test connection in `async_step_user()`: create API client, call `connect()` and `get_system_info()`
-- [ ] If auth code provided, call `authenticate()`
-- [ ] Set unique ID to serial number from system info (or hash of host if unavailable)
-- [ ] Handle errors: `cannot_connect`, `invalid_auth`, `timeout`
-- [ ] Update `translations/en.json` with new field labels and error messages
+- [x] Update `STEP_USER_DATA_SCHEMA` with new fields (host, port, auth_code)
+- [x] Test connection in `async_step_user()`: create API client, call `connect()` and `get_system_info()`
+- [x] If auth code provided, call `authenticate()`
+- [x] Set unique ID to serial number from system info
+- [x] Handle errors: `cannot_connect`, `invalid_auth`, `timeout`
+- [x] Update `translations/en.json` with new field labels and error messages
+
+**Status:** ✅ **COMPLETED** (implemented in Phase 2)
 
 ---
 

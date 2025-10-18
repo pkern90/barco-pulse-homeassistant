@@ -17,9 +17,9 @@ if TYPE_CHECKING:
 
 ENTITY_DESCRIPTIONS = (
     SwitchEntityDescription(
-        key="barco_pulse",
-        name="Integration Switch",
-        icon="mdi:format-quote-close",
+        key="power",
+        name="Power",
+        icon="mdi:power",
     ),
 )
 
@@ -54,14 +54,14 @@ class BarcoPulseSwitch(BarcoPulseEntity, SwitchEntity):
     @property
     def is_on(self) -> bool:
         """Return true if the switch is on."""
-        return self.coordinator.data.get("title", "") == "foo"
+        return self.coordinator.data.get("power", {}).get("is_on", False)
 
     async def async_turn_on(self, **_: Any) -> None:
         """Turn on the switch."""
-        await self.coordinator.config_entry.runtime_data.client.async_set_title("bar")
+        await self.coordinator.config_entry.runtime_data.client.power_on()
         await self.coordinator.async_request_refresh()
 
     async def async_turn_off(self, **_: Any) -> None:
         """Turn off the switch."""
-        await self.coordinator.config_entry.runtime_data.client.async_set_title("foo")
+        await self.coordinator.config_entry.runtime_data.client.power_off()
         await self.coordinator.async_request_refresh()
