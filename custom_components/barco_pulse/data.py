@@ -1,4 +1,4 @@
-"""Custom types for integration_blueprint."""
+"""Custom types for barco_pulse."""
 
 from __future__ import annotations
 
@@ -9,17 +9,17 @@ if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
     from homeassistant.loader import Integration
 
-    from .api import IntegrationBlueprintApiClient
-    from .coordinator import BlueprintDataUpdateCoordinator
+    from .api import BarcoPulseApiClient
+    from .coordinator import BarcoPulseDataUpdateCoordinator
 
 
-type IntegrationBlueprintConfigEntry = ConfigEntry[IntegrationBlueprintData]
+type BarcoPulseConfigEntry = ConfigEntry[BarcoPulseData]
 
 
 @dataclass
-class IntegrationBlueprintData:
-    """Data for the Blueprint integration."""
+class BarcoPulseData:
+    """Data for the Barco Pulse integration."""
 
-    client: IntegrationBlueprintApiClient
-    coordinator: BlueprintDataUpdateCoordinator
+    client: BarcoPulseApiClient
+    coordinator: BarcoPulseDataUpdateCoordinator
     integration: Integration

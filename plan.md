@@ -22,20 +22,20 @@ Template-based skeleton with placeholder API. Goal: Transform into functional Ba
 **Files:** `const.py`, `manifest.json`
 
 **Tasks:**
-- [ ] `const.py`: Change `DOMAIN` to `"barco_pulse"`, update `ATTRIBUTION`
-- [ ] `manifest.json`: Update domain, name, iot_class to `"local_polling"`
+- [x] `const.py`: Change `DOMAIN` to `"barco_pulse"`, update `ATTRIBUTION`
+- [x] `manifest.json`: Update domain, name, iot_class to `"local_polling"`
 
 ### 1.2 Rename All Classes
 
 **Files:** `data.py`, `__init__.py`, `coordinator.py`, `entity.py`, all platform files
 
 **Tasks:**
-- [ ] `IntegrationBlueprintData` → `BarcoPulseData`
-- [ ] `IntegrationBlueprintConfigEntry` → `BarcoPulseConfigEntry`
-- [ ] `BlueprintDataUpdateCoordinator` → `BarcoPulseDataUpdateCoordinator`
-- [ ] `IntegrationBlueprintEntity` → `BarcoPulseEntity`
-- [ ] Entity classes: `IntegrationBlueprintSensor` → `BarcoPulseSensor`, etc.
-- [ ] Update all imports and type hints
+- [x] `IntegrationBlueprintData` → `BarcoPulseData`
+- [x] `IntegrationBlueprintConfigEntry` → `BarcoPulseConfigEntry`
+- [x] `BlueprintDataUpdateCoordinator` → `BarcoPulseDataUpdateCoordinator`
+- [x] `IntegrationBlueprintEntity` → `BarcoPulseEntity`
+- [x] Entity classes: `IntegrationBlueprintSensor` → `BarcoPulseSensor`, etc.
+- [x] Update all imports and type hints
 
 ---
 
