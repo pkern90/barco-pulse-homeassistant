@@ -13,6 +13,7 @@ from custom_components.barco_pulse.const import CONF_AUTH_CODE, CONF_PORT, DOMAI
 
 if TYPE_CHECKING:
     from collections.abc import Generator
+
     from homeassistant.core import HomeAssistant
 
 pytest_plugins = "pytest_homeassistant_custom_component"

@@ -2,12 +2,20 @@
 
 ## Project Status
 
-Template-based skeleton with placeholder API. Goal: Transform into functional Barco Pulse projector integration using JSON-RPC 2.0 API over TCP (port 9090).
+**Current Status:** Phase 2 - API Client Implementation (In Progress)
+
+**Discovered:** The Barco HDR CS projector uses a hybrid HTTP/0.9-style JSON-RPC protocol:
+- **Request:** HTTP POST with JSON-RPC 2.0 payload
+- **Response:** Raw JSON (no HTTP headers)
+- **Port:** 9090
+- **Test Projector:** Barco HDR CS at 192.168.30.206 (Serial: 2590381267)
+
+Template-based skeleton with placeholder API. Goal: Transform into functional Barco Pulse projector integration using JSON-RPC 2.0 API over HTTP POST (port 9090).
 
 ## Core Objectives
 
-1. Rename all `integration_blueprint` references to `barco_pulse`
-2. Implement JSON-RPC 2.0 TCP client in `api.py`
+1. ✅ Rename all `integration_blueprint` references to `barco_pulse`
+2. 🔄 Implement JSON-RPC 2.0 HTTP client in `api.py` (HTTP POST + raw JSON response)
 3. Create coordinator data model for projector state
 4. Implement entities (sensors, switches, binary sensors)
 5. Update config flow for projector setup
@@ -39,72 +47,110 @@ Template-based skeleton with placeholder API. Goal: Transform into functional Ba
 
 ---
 
-## Phase 2: JSON-RPC 2.0 TCP API Client
+## Phase 2: JSON-RPC 2.0 HTTP API Client
 
 **File:** `api.py`
+
+**Status:** 🔄 In Progress
+
+**Discovery:** Barco HDR CS uses HTTP POST for requests but returns raw JSON responses without HTTP headers (HTTP/0.9-style). This requires a hybrid approach using TCP sockets to send HTTP POST requests and read raw JSON responses.
 
 ### 2.1 API Client Structure
 
 ```python
 class BarcoPulseApiClient:
     def __init__(self, host: str, port: int = 9090, auth_code: int | None = None)
-    
-    # Connection
+
+    # Connection (TCP socket for HTTP POST + raw JSON response)
     async def connect() -> None
     async def disconnect() -> None
-    
-    # Core JSON-RPC
-    async def call_method(method: str, params: dict | None = None) -> Any
-    
+
+    # Core JSON-RPC (send HTTP POST, read raw JSON)
+    async def _send_request(method: str, params: dict | None = None) -> Any
+
     # Power control
     async def power_on() -> None
     async def power_off() -> None
-    
+
     # Property access
     async def get_property(property_name: str | list[str]) -> Any
     async def set_property(property_name: str, value: Any) -> None
-    
+
     # State queries
     async def get_system_state() -> str
     async def get_system_info() -> dict
-    
+
     # Source management
     async def list_sources() -> list[str]
     async def get_active_source() -> str
     async def set_active_source(source: str) -> None
-    
+
     # Illumination
     async def get_laser_power() -> float
     async def set_laser_power(power: float) -> None
-    
-    # Internal
-    async def _read_loop() -> None
-    async def _send_request(request: dict) -> dict
 ```
 
-### 2.2 JSON-RPC Protocol
+### 2.2 Communication Protocol
 
-**Request:** `{"jsonrpc":"2.0","method":str,"params":dict,"id":int}`  
-**Response:** `{"jsonrpc":"2.0","result":any,"id":int}` or `{"jsonrpc":"2.0","error":{...},"id":int}`  
-**Notification:** `{"jsonrpc":"2.0","method":str,"params":dict}` (no id)
+**Connection:** TCP socket to `host:port` (default port 9090)
 
-### 2.3 Exception Classes
+**Request Format:** HTTP POST with JSON-RPC 2.0 payload
+```http
+POST / HTTP/1.1
+Host: {host}
+Content-Type: application/json
+Content-Length: {length}
+
+{"jsonrpc":"2.0","method":"property.get","params":{"property":"system.state"},"id":1}
+```
+
+**Response Format:** Raw JSON (no HTTP headers - HTTP/0.9 style)
+```json
+{"jsonrpc":"2.0","id":1,"result":"on"}
+```
+
+**Error Response:**
+```json
+{"jsonrpc":"2.0","id":1,"error":{"code":-32601,"message":"Method not found"}}
+```
+
+### 2.3 Implementation Details
+
+**Key Points:**
+- Use `asyncio.open_connection()` for TCP socket
+- Send HTTP POST headers + JSON-RPC payload
+- Read raw JSON response (no HTTP response headers)
+- Parse JSON directly from socket data
+- Handle connection pooling for multiple requests
+- Implement request timeout handling
+- Support optional authentication via `authenticate` method
+
+**Tested Commands:**
+- ✅ `property.get` with single property: `"system.serialnumber"` → `"2590381267"`
+- ✅ `property.get` with multiple properties (returns dict)
+- ✅ `introspect` for API discovery
+
+### 2.4 Exception Classes
 
 ```python
 class BarcoPulseApiError(Exception): pass
 class BarcoPulseConnectionError(BarcoPulseApiError): pass
 class BarcoPulseAuthenticationError(BarcoPulseApiError): pass
 class BarcoPulseTimeoutError(BarcoPulseApiError): pass
-class BarcoPulseCommandError(BarcoPulseApiError): pass
+class BarcoPulseCommandError(BarcoPulseApiError):
+    def __init__(self, message: str, code: int | None = None)
 ```
 
-### 2.4 Implementation Tasks
+### 2.5 Implementation Tasks
 
 **Core Transport:**
 - [x] TCP connection with `asyncio.open_connection()` and timeouts
+- [ ] ⚠️ Replace TCP-only approach with HTTP POST + raw JSON response
 - [x] Request ID generator (incrementing int)
 - [x] JSON-RPC message encode/decode
-- [x] Background `_read_loop()` for responses
+- [ ] ⚠️ Update to send HTTP POST headers before JSON payload
+- [ ] ⚠️ Update to read raw JSON (skip HTTP response headers)
+- [ ] Remove background `_read_loop()` (synchronous request/response pattern)
 - [x] Request/response correlation using Future dict
 - [x] Disconnect cleanup
 
@@ -309,17 +355,17 @@ class BarcoPulseCommandError(BarcoPulseApiError): pass
 ## Implementation Priority
 
 ### MVP (Required)
-**Phases:** 1, 2 (core methods), 3, 4.1-4.3, 5, 6  
-**Focus:** Basic power control, state monitoring, config flow  
+**Phases:** 1, 2 (core methods), 3, 4.1-4.3, 5, 6
+**Focus:** Basic power control, state monitoring, config flow
 **Time:** ~25-35 hours
 
 ### v1.0 (Enhanced)
-**Phases:** Complete all MVP + Phase 7 optional enhancements  
-**Focus:** Full feature set with source selection, laser power control  
+**Phases:** Complete all MVP + Phase 7 optional enhancements
+**Focus:** Full feature set with source selection, laser power control
 **Time:** ~40-50 hours
 
 ### v1.1+ (Future)
-**Focus:** Custom services, discovery, advanced entities  
+**Focus:** Custom services, discovery, advanced entities
 **Time:** ~15-25 hours
 
 ---
@@ -357,5 +403,50 @@ client.power_off()
 "system.modelname"                # Model name
 "system.firmwareversion"          # Firmware version
 "image.window.main.source"        # Active source
+"illumination.sources.laser.power" # Laser power (percentage)
+```
+
+---
+
+## Troubleshooting & Discoveries
+
+### Barco HDR CS Protocol Discovery (Oct 2025)
+
+**Problem:** Initial implementation used standard JSON-RPC 2.0 over TCP (newline-delimited), which worked for connection but projector never responded to requests.
+
+**Root Cause:** The Barco HDR CS projector uses a hybrid HTTP/0.9-style protocol:
+- **Accepts:** HTTP POST requests with JSON-RPC 2.0 payload
+- **Returns:** Raw JSON response WITHOUT HTTP headers
+
+**Testing:**
+```bash
+# This works with curl --http0.9 flag
+curl --http0.9 -X POST -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","method":"property.get","params":{"property":"system.serialnumber"},"id":1}' \
+  http://192.168.30.206:9090
+
+# Response (raw JSON, no HTTP headers):
+{"jsonrpc":"2.0","id":1,"result":"2590381267"}
+```
+
+**Solution:**
+1. Use TCP socket (`asyncio.open_connection`)
+2. Send HTTP POST request with headers + JSON-RPC payload
+3. Read raw response (skip HTTP response header parsing)
+4. Parse JSON directly from socket data
+
+**Test Scripts:**
+- `scripts/test_http09.py` - Validates HTTP POST + raw JSON response
+- `scripts/test_raw_connection.py` - Raw TCP test
+- `scripts/test_projector_connection.py` - High-level connection test
+
+**Configuration Notes:**
+- Update `config/configuration.yaml` logger to use `custom_components.barco_pulse` (not `integration_blueprint`)
+- Test projector: Barco HDR CS at 192.168.30.206 (Serial: 2590381267)
+
+**Model Compatibility:**
+- ✅ Barco HDR CS - Confirmed working with HTTP POST + raw JSON
+- ❓ Other Barco Pulse models - May use standard TCP with newline-delimited JSON
+- Consider adding protocol detection or configuration option if supporting multiple models
 "illumination.sources.laser.power" # Laser power (0-100)
 ```

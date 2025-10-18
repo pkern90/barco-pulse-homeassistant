@@ -1,9 +1,16 @@
-"""Barco Pulse JSON-RPC 2.0 API Client."""
+"""
+Barco Pulse JSON-RPC 2.0 API Client.
+
+This client communicates with Barco HDR CS projectors using a hybrid HTTP/0.9 protocol:
+- Sends HTTP POST requests with JSON-RPC 2.0 payload
+- Receives raw JSON responses (without HTTP headers)
+
+This is a synchronous request/response pattern (no background read loop needed).
+"""
 
 from __future__ import annotations
 
 import asyncio
-import contextlib
 import json
 import logging
 from typing import Any
@@ -37,7 +44,7 @@ class BarcoPulseCommandError(BarcoPulseApiError):
 
 
 class BarcoPulseApiClient:
-    """Barco Pulse projector API client using JSON-RPC 2.0 over TCP."""
+    """Barco Pulse projector API client using JSON-RPC 2.0 over HTTP/0.9."""
 
     def __init__(
         self,
@@ -61,39 +68,31 @@ class BarcoPulseApiClient:
         self._auth_code = auth_code
         self._timeout = timeout
 
-        # Connection state
-        self._reader: asyncio.StreamReader | None = None
-        self._writer: asyncio.StreamWriter | None = None
-        self._connected = False
-        self._read_task: asyncio.Task | None = None
-
-        # Request/response correlation
+        # Request ID counter
         self._request_id = 0
-        self._pending_requests: dict[int, asyncio.Future] = {}
         self._lock = asyncio.Lock()
 
-    @property
-    def is_connected(self) -> bool:
-        """Return True if connected to projector."""
-        return self._connected
+        # Connection state (validated on first request)
+        self._validated = False
 
     async def connect(self) -> None:
-        """Connect to the projector and start read loop."""
-        if self._connected:
-            _LOGGER.debug("Already connected to %s:%d", self._host, self._port)
-            return
+        """
+        Validate connection to the projector.
+
+        This performs a test request to verify the projector is reachable.
+        Authentication is performed if auth_code was provided.
+        """
+        _LOGGER.info(
+            "Validating connection to Barco Pulse at %s:%d",
+            self._host,
+            self._port,
+        )
 
         try:
-            _LOGGER.info("Connecting to Barco Pulse at %s:%d", self._host, self._port)
-            self._reader, self._writer = await asyncio.wait_for(
-                asyncio.open_connection(self._host, self._port),
-                timeout=self._timeout,
-            )
-            self._connected = True
-            _LOGGER.info("Connected to %s:%d", self._host, self._port)
-
-            # Start background read loop
-            self._read_task = asyncio.create_task(self._read_loop())
+            # Test connection with a simple property get
+            await self.get_property("system.serialnumber")
+            self._validated = True
+            _LOGGER.info("Connection validated to %s:%d", self._host, self._port)
 
             # Authenticate if auth code provided
             if self._auth_code is not None:
@@ -107,116 +106,20 @@ class BarcoPulseApiClient:
             raise BarcoPulseConnectionError(msg) from err
 
     async def disconnect(self) -> None:
-        """Disconnect from the projector."""
-        if not self._connected:
-            return
-
-        _LOGGER.info("Disconnecting from %s:%d", self._host, self._port)
-        self._connected = False
-
-        # Cancel read task
-        if self._read_task and not self._read_task.done():
-            self._read_task.cancel()
-            with contextlib.suppress(asyncio.CancelledError):
-                await self._read_task
-
-        # Close writer
-        if self._writer:
-            self._writer.close()
-            try:
-                await self._writer.wait_closed()
-            except Exception as err:  # noqa: BLE001
-                _LOGGER.debug("Error closing writer: %s", err)
-
-        # Cancel pending requests
-        for future in self._pending_requests.values():
-            if not future.done():
-                future.set_exception(BarcoPulseConnectionError("Connection closed"))
-        self._pending_requests.clear()
-
-        self._reader = None
-        self._writer = None
-        self._read_task = None
-        _LOGGER.info("Disconnected from %s:%d", self._host, self._port)
-
-    async def _read_loop(self) -> None:
-        """Background loop to read responses and notifications from projector."""
-        _LOGGER.debug("Starting read loop")
-        try:
-            while self._connected and self._reader:
-                try:
-                    # Read line (JSON-RPC messages are newline-delimited)
-                    line = await self._reader.readline()
-                    if not line:
-                        _LOGGER.warning("Connection closed by projector")
-                        break
-
-                    # Parse JSON
-                    try:
-                        message = json.loads(line.decode("utf-8").strip())
-                        _LOGGER.debug("Received: %s", message)
-                    except json.JSONDecodeError:
-                        _LOGGER.exception("Invalid JSON received")
-                        continue
-
-                    # Handle response (has 'id' field)
-                    if "id" in message:
-                        await self._handle_response(message)
-                    # Handle notification (no 'id' field)
-                    else:
-                        await self._handle_notification(message)
-
-                except Exception:
-                    _LOGGER.exception("Error in read loop")
-                    if not self._connected:
-                        break
-
-        except asyncio.CancelledError:
-            _LOGGER.debug("Read loop cancelled")
-        finally:
-            _LOGGER.debug("Read loop ended")
-            if self._connected:
-                # Connection lost unexpectedly
-                await self.disconnect()
-
-    async def _handle_response(self, message: dict[str, Any]) -> None:
-        """Handle JSON-RPC response message."""
-        request_id = message.get("id")
-        if request_id not in self._pending_requests:
-            _LOGGER.warning("Received response for unknown request ID: %s", request_id)
-            return
-
-        future = self._pending_requests.pop(request_id)
-
-        # Check for error
-        if "error" in message:
-            error = message["error"]
-            error_code = error.get("code")
-            error_message = error.get("message", "Unknown error")
-            _LOGGER.error("JSON-RPC error %s: %s", error_code, error_message)
-            future.set_exception(BarcoPulseCommandError(error_message, error_code))
-        # Success response
-        elif "result" in message:
-            future.set_result(message["result"])
-        else:
-            future.set_exception(
-                BarcoPulseCommandError("Invalid response: missing result or error")
-            )
-
-    async def _handle_notification(self, message: dict[str, Any]) -> None:
-        """Handle JSON-RPC notification message (property changes, signals)."""
-        method = message.get("method")
-        params = message.get("params", {})
-        _LOGGER.debug("Notification: %s with params: %s", method, params)
-        # For now, just log notifications
-        # Future: could implement callback handlers for
-        # property.changed, signal.callback
+        """Disconnect from the projector (no persistent connection)."""
+        # No persistent connection to close
+        self._validated = False
+        _LOGGER.debug("Disconnected from %s:%d", self._host, self._port)
 
     async def _send_request(
         self, method: str, params: dict[str, Any] | None = None
     ) -> Any:
         """
-        Send JSON-RPC request and wait for response.
+        Send JSON-RPC request using HTTP POST and wait for raw JSON response.
+
+        The projector uses a hybrid HTTP/0.9 protocol:
+        - Accepts HTTP POST requests with JSON-RPC 2.0 payload
+        - Returns raw JSON (without HTTP response headers)
 
         Args:
             method: JSON-RPC method name
@@ -226,15 +129,11 @@ class BarcoPulseApiClient:
             The result from the JSON-RPC response
 
         Raises:
-            BarcoPulseConnectionError: If not connected
+            BarcoPulseConnectionError: If connection fails
             BarcoPulseTimeoutError: If request times out
             BarcoPulseCommandError: If JSON-RPC error returned
 
         """
-        if not self._connected or not self._writer:
-            msg = "Not connected to projector"
-            raise BarcoPulseConnectionError(msg)
-
         async with self._lock:
             # Generate request ID
             self._request_id += 1
@@ -249,36 +148,84 @@ class BarcoPulseApiClient:
             if params is not None:
                 request["params"] = params
 
-            # Create future for response
-            future: asyncio.Future = asyncio.Future()
-            self._pending_requests[request_id] = future
+            # Log request (redact auth code)
+            log_request = request.copy()
+            if method == "authenticate" and "params" in log_request:
+                log_params = log_request["params"].copy()
+                log_params["code"] = "REDACTED"
+                log_request["params"] = log_params
+            _LOGGER.debug("Sending request: %s", log_request)
 
-            # Send request
             try:
-                message = json.dumps(request) + "\n"
-                # Redact auth code in logs
-                log_request = request.copy()
-                if method == "authenticate" and "params" in log_request:
-                    log_params = log_request["params"].copy()
-                    log_params["code"] = "REDACTED"
-                    log_request["params"] = log_params
-                _LOGGER.debug("Sending: %s", log_request)
+                # Open TCP connection
+                reader, writer = await asyncio.wait_for(
+                    asyncio.open_connection(self._host, self._port),
+                    timeout=self._timeout,
+                )
 
-                self._writer.write(message.encode("utf-8"))
-                await self._writer.drain()
+                try:
+                    # Send HTTP POST request
+                    json_data = json.dumps(request)
+                    http_request = (
+                        f"POST / HTTP/1.1\r\n"
+                        f"Host: {self._host}\r\n"
+                        f"Content-Type: application/json\r\n"
+                        f"Content-Length: {len(json_data)}\r\n"
+                        f"\r\n"
+                        f"{json_data}"
+                    )
 
-            except Exception as err:
-                self._pending_requests.pop(request_id, None)
-                msg = f"Error sending request: {err}"
+                    writer.write(http_request.encode())
+                    await writer.drain()
+
+                    # Read response (raw JSON, possibly with HTTP headers)
+                    data = await asyncio.wait_for(
+                        reader.read(4096),
+                        timeout=self._timeout,
+                    )
+                    response_text = data.decode("utf-8")
+
+                    # Extract JSON (skip HTTP headers if present)
+                    json_start = response_text.find("{")
+                    if json_start < 0:
+                        msg = f"No JSON in response: {response_text[:100]}"
+                        raise BarcoPulseCommandError(msg)
+
+                    json_text = response_text[json_start:]
+                    message = json.loads(json_text)
+                    _LOGGER.debug("Received response: %s", message)
+
+                    # Check for JSON-RPC error
+                    if "error" in message:
+                        error = message["error"]
+                        error_code = error.get("code")
+                        error_message = error.get("message", "Unknown error")
+                        _LOGGER.error(
+                            "JSON-RPC error %s: %s", error_code, error_message
+                        )
+                        raise BarcoPulseCommandError(error_message, error_code)
+
+                    # Return result
+                    if "result" in message:
+                        return message["result"]
+
+                    msg = "Invalid response: missing result or error"
+                    raise BarcoPulseCommandError(msg)
+
+                finally:
+                    # Always close connection
+                    writer.close()
+                    await writer.wait_closed()
+
+            except TimeoutError as err:
+                msg = f"Request timeout for method: {method}"
+                raise BarcoPulseTimeoutError(msg) from err
+            except OSError as err:
+                msg = f"Connection error: {err}"
                 raise BarcoPulseConnectionError(msg) from err
-
-        # Wait for response
-        try:
-            return await asyncio.wait_for(future, timeout=self._timeout)
-        except TimeoutError as err:
-            self._pending_requests.pop(request_id, None)
-            msg = f"Request timeout for method: {method}"
-            raise BarcoPulseTimeoutError(msg) from err
+            except json.JSONDecodeError as err:
+                msg = f"Invalid JSON response: {err}"
+                raise BarcoPulseCommandError(msg) from err
 
     # Authentication
 
@@ -444,8 +391,15 @@ class BarcoPulseApiClient:
         result = await self.get_property("illumination.sources.laser.power")
         # Extract value from result dict if present
         if isinstance(result, dict) and "value" in result:
-            return float(result["value"])
-        return float(result)
+            value = result["value"]
+            if isinstance(value, (int, float, str)):
+                return float(value)
+            msg = f"Invalid laser power value type: {type(value)}"
+            raise BarcoPulseApiError(msg)
+        if isinstance(result, (int, float, str)):
+            return float(result)
+        msg = f"Invalid laser power result type: {type(result)}"
+        raise BarcoPulseApiError(msg)
 
     async def set_laser_power(self, power: float) -> None:
         """
