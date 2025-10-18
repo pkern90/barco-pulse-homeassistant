@@ -355,8 +355,11 @@ class BarcoPulseApiClient:
             "conditioning", "on", "deconditioning"
 
         """
-        state = await self.get_property("system.state")
-        return str(state)
+        result = await self.get_property("system.state")
+        # Extract value from result dict if present
+        if isinstance(result, dict) and "value" in result:
+            return str(result["value"])
+        return str(result)
 
     async def get_system_info(self) -> dict[str, Any]:
         """
@@ -370,6 +373,20 @@ class BarcoPulseApiClient:
         props = await self.get_property(
             ["system.serialnumber", "system.modelname", "system.firmwareversion"]
         )
+
+        # Handle list response (array of {property, value} dicts)
+        if isinstance(props, list):
+            result = {}
+            for item in props:
+                if isinstance(item, dict) and "property" in item and "value" in item:
+                    result[item["property"]] = item["value"]
+            return {
+                "serial_number": result.get("system.serialnumber", ""),
+                "model_name": result.get("system.modelname", ""),
+                "firmware_version": result.get("system.firmwareversion", ""),
+            }
+
+        # Handle dict response
         return {
             "serial_number": props.get("system.serialnumber", ""),
             "model_name": props.get("system.modelname", ""),
@@ -397,8 +414,11 @@ class BarcoPulseApiClient:
             Source name (e.g., "DisplayPort 1")
 
         """
-        source = await self.get_property("image.window.main.source")
-        return str(source)
+        result = await self.get_property("image.window.main.source")
+        # Extract value from result dict if present
+        if isinstance(result, dict) and "value" in result:
+            return str(result["value"])
+        return str(result)
 
     async def set_active_source(self, source: str) -> None:
         """
@@ -421,8 +441,11 @@ class BarcoPulseApiClient:
             Laser power as percentage (0.0-100.0)
 
         """
-        power = await self.get_property("illumination.laserpower")
-        return float(power)
+        result = await self.get_property("illumination.sources.laser.power")
+        # Extract value from result dict if present
+        if isinstance(result, dict) and "value" in result:
+            return float(result["value"])
+        return float(result)
 
     async def set_laser_power(self, power: float) -> None:
         """
@@ -433,4 +456,4 @@ class BarcoPulseApiClient:
 
         """
         _LOGGER.info("Setting laser power to: %.1f%%", power)
-        await self.set_property("illumination.laserpower", power)
+        await self.set_property("illumination.sources.laser.power", power)

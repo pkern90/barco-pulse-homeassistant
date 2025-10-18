@@ -50,10 +50,15 @@ class BarcoPulseSwitch(BarcoPulseEntity, SwitchEntity):
         """Initialize the switch class."""
         super().__init__(coordinator)
         self.entity_description = entity_description
+        # Update unique_id to include entity description key
+        self._attr_unique_id = f"{self._attr_unique_id}_{entity_description.key}"
 
     @property
-    def is_on(self) -> bool:
+    def is_on(self) -> bool | None:
         """Return true if the switch is on."""
+        # Return None if no data available
+        if self.coordinator.data is None:
+            return None
         return self.coordinator.data.get("power", {}).get("is_on", False)
 
     async def async_turn_on(self, **_: Any) -> None:

@@ -17,12 +17,18 @@ class BarcoPulseEntity(CoordinatorEntity[BarcoPulseDataUpdateCoordinator]):
     def __init__(self, coordinator: BarcoPulseDataUpdateCoordinator) -> None:
         """Initialize."""
         super().__init__(coordinator)
-        self._attr_unique_id = coordinator.config_entry.entry_id
+        # Use serial number if available, otherwise use entry_id as fallback
+        serial = None
+        if coordinator.data and isinstance(coordinator.data, dict):
+            serial = coordinator.data.get("system", {}).get("serial_number")
+
+        base_id = serial or coordinator.config_entry.entry_id
+        self._attr_unique_id = base_id
         self._attr_device_info = DeviceInfo(
             identifiers={
                 (
                     coordinator.config_entry.domain,
-                    coordinator.config_entry.entry_id,
+                    base_id,
                 ),
             },
         )

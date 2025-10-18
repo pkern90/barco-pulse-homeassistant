@@ -86,10 +86,16 @@ class BarcoPulseSensor(BarcoPulseEntity, SensorEntity):
         """Initialize the sensor class."""
         super().__init__(coordinator)
         self.entity_description = entity_description
+        # Update unique_id to include entity description key
+        self._attr_unique_id = f"{self._attr_unique_id}_{entity_description.key}"
 
     @property
     def native_value(self) -> str | float | None:
         """Return the native value of the sensor."""
+        # Return None if no data available
+        if self.coordinator.data is None:
+            return None
+
         # Map entity key to coordinator data
         if self.entity_description.key == "system_state":
             return self.coordinator.data.get("system", {}).get("state")

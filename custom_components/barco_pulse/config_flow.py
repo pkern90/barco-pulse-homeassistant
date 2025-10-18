@@ -106,6 +106,7 @@ class BarcoPulseFlowHandler(config_entries.ConfigFlow, domain=DOMAIN):
         )
         try:
             await client.connect()
+            # Note: authenticate is called automatically in connect() if auth_code is provided
             return await client.get_system_info()
         finally:
             await client.disconnect()
