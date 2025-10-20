@@ -1,0 +1,34 @@
+{
+    "config": {
+        "step": {
+            "user": {
+                "title": "Connect to Barco Pulse Projector",
+                "description": "Enter the connection details for your Barco Pulse projector.",
+                "data": {
+                    "host": "IP Address or Hostname",
+                    "port": "Port",
+                    "auth_code": "Authentication Code (Optional)"
+                }
+            },
+            "reconfigure": {
+                "title": "Reconfigure Barco Pulse Projector",
+                "description": "Update the connection details for your Barco Pulse projector.",
+                "data": {
+                    "host": "IP Address or Hostname",
+                    "port": "Port",
+                    "auth_code": "Authentication Code (Optional)"
+                }
+            }
+        },
+        "error": {
+            "cannot_connect": "Failed to connect to the projector. Please check the IP address and port.",
+            "invalid_auth": "Authentication failed. Please check the authentication code.",
+            "unknown": "An unexpected error occurred. Please try again."
+        },
+        "abort": {
+            "already_configured": "This projector is already configured.",
+            "reconfigure_successful": "Reconfiguration successful.",
+            "reconfigure_failed": "Reconfiguration failed. Please try again."
+        }
+    }
+}
