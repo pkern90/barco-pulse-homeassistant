@@ -96,6 +96,47 @@ class BarcoPresetSelect(BarcoEntity, SelectEntity):
             _LOGGER.exception("Failed to parse preset option %s", option)
 
 
+class BarcoProfileSelect(BarcoEntity, SelectEntity):
+    """Barco Pulse profile select entity."""
+
+    _attr_translation_key = "profile"
+    _attr_icon = "mdi:image-filter-hdr"
+
+    def __init__(self, coordinator: BarcoDataUpdateCoordinator) -> None:
+        """Initialize the profile select."""
+        super().__init__(coordinator)
+        self._attr_unique_id = f"{coordinator.unique_id}_profile"
+
+    @property
+    def current_option(self) -> str | None:
+        """Return the current selected profile."""
+        # There's no direct way to get the "active" profile, so we don't show selection
+        return None
+
+    @property
+    def options(self) -> list[str]:
+        """Return the list of available profiles."""
+        profiles = self.coordinator.data.get("profiles", [])
+
+        # If no profiles exist, show message
+        if not profiles:
+            return ["No profiles configured"]
+
+        return profiles
+
+    @property
+    def available(self) -> bool:
+        """Return if entity is available."""
+        # Only available when projector is powered on
+        state = self.coordinator.data.get("state")
+        return state in ("on", "ready")
+
+    async def async_select_option(self, option: str) -> None:
+        """Select and activate a profile."""
+        await self.coordinator.device.activate_profile(option)
+        await self.coordinator.async_request_refresh()
+
+
 async def async_setup_entry(
     _hass: HomeAssistant,
     entry: ConfigEntry,
@@ -108,6 +149,7 @@ async def async_setup_entry(
     entities = [
         BarcoSourceSelect(coordinator),
         BarcoPresetSelect(coordinator),
+        BarcoProfileSelect(coordinator),
     ]
 
     async_add_entities(entities)

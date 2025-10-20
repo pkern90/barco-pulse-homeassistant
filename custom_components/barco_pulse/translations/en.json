@@ -68,6 +68,9 @@
             },
             "preset": {
                 "name": "Preset"
+            },
+            "profile": {
+                "name": "Profile"
             }
         },
         "number": {
