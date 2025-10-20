@@ -3,62 +3,62 @@
 ## 2.1 Coordinator Implementation (`custom_components/barco_pulse/coordinator.py`)
 
 ### Class Structure
-- [ ] Import `DataUpdateCoordinator`, `UpdateFailed`, `ConfigEntryAuthFailed`
-- [ ] Import constants from `const.py`
-- [ ] Import `BarcoDevice` from `api.py`
-- [ ] Import exceptions from `exceptions.py`
-- [ ] Create `BarcoDataUpdateCoordinator` extending `DataUpdateCoordinator[dict[str, Any]]`
+- [x] Import `DataUpdateCoordinator`, `UpdateFailed`, `ConfigEntryAuthFailed`
+- [x] Import constants from `const.py`
+- [x] Import `BarcoDevice` from `api.py`
+- [x] Import exceptions from `exceptions.py`
+- [x] Create `BarcoDataUpdateCoordinator` extending `DataUpdateCoordinator[dict[str, Any]]`
 
 ### Initialization
-- [ ] Implement `__init__(hass, device)` calling super with initial slow interval
-- [ ] Store `device: BarcoDevice` reference
-- [ ] Initialize `_connection_lock: asyncio.Lock`
-- [ ] Initialize `_update_lock: asyncio.Lock`
-- [ ] Initialize `_last_update: float = 0.0`
+- [x] Implement `__init__(hass, device)` calling super with initial slow interval
+- [x] Store `device: BarcoDevice` reference
+- [x] Initialize `_connection_lock: asyncio.Lock`
+- [x] Initialize `_update_lock: asyncio.Lock`
+- [x] Initialize `_last_update: float = 0.0`
 
 ### Rate Limiting
-- [ ] Implement `async def _enforce_rate_limit()` with 1-second minimum interval
-- [ ] Calculate elapsed time since last update
-- [ ] Sleep if elapsed < 1.0 seconds
-- [ ] Update `_last_update` timestamp
+- [x] Implement `async def _enforce_rate_limit()` with 1-second minimum interval
+- [x] Calculate elapsed time since last update
+- [x] Sleep if elapsed < 1.0 seconds
+- [x] Update `_last_update` timestamp
 
 ### Info Properties Fetching
-- [ ] Implement `async def _get_info_properties()` returning dict
-- [ ] Get `system.serialnumber`, `system.modelname`, `system.firmwareversion`
-- [ ] Use batch `get_properties()` for efficiency
-- [ ] Return property dict
+- [x] Implement `async def _get_info_properties()` returning dict
+- [x] Get `system.serialnumber`, `system.modelname`, `system.firmwareversion`
+- [x] Use batch `get_properties()` for efficiency
+- [x] Return property dict
 
 ### Active State Properties Fetching
-- [ ] Implement `async def _get_active_properties()` returning dict
-- [ ] Wrap all calls in try/except for `BarcoStateError`
-- [ ] Get laser power using `get_laser_power()`
-- [ ] Get laser limits using `get_laser_limits()`
-- [ ] Get current source using `get_source()`
-- [ ] Get available sources using `get_available_sources()`
-- [ ] Get brightness using `get_brightness()`
-- [ ] Get contrast using `get_contrast()`
-- [ ] Get saturation using `get_saturation()`
-- [ ] Get hue using `get_hue()`
-- [ ] Return property dict (skip properties that raise `BarcoStateError`)
+- [x] Implement `async def _get_active_properties()` returning dict
+- [x] Wrap all calls in try/except for `BarcoStateError`
+- [x] Get laser power using `get_laser_power()`
+- [x] Get laser limits using `get_laser_limits()`
+- [x] Get current source using `get_source()`
+- [x] Get available sources using `get_available_sources()`
+- [x] Get brightness using `get_brightness()`
+- [x] Get contrast using `get_contrast()`
+- [x] Get saturation using `get_saturation()`
+- [x] Get hue using `get_hue()`
+- [x] Return property dict (skip properties that raise `BarcoStateError`)
 
 ### Main Update Logic
-- [ ] Implement `async def _async_update_data()` returning `dict[str, Any]`
-- [ ] Acquire `_update_lock` for thread safety
-- [ ] Call `_enforce_rate_limit()`
-- [ ] Get system state using `device.get_state()`
-- [ ] Initialize data dict with state
-- [ ] Get info properties using `_get_info_properties()`
-- [ ] Check if state in `POWER_STATES_ACTIVE`
-- [ ] If active, get active properties and set update interval to `INTERVAL_FAST`
-- [ ] If not active, set update interval to `INTERVAL_SLOW`
-- [ ] Return complete data dict
+- [x] Implement `async def _async_update_data()` returning `dict[str, Any]`
+- [x] Acquire `_update_lock` for thread safety
+- [x] Call `_enforce_rate_limit()`
+- [x] Get system state using `device.get_state()`
+- [x] Initialize data dict with state
+- [x] Get info properties using `_get_info_properties()`
+- [x] Check if state in `POWER_STATES_ACTIVE`
+- [x] If active, get active properties and set update interval to `INTERVAL_FAST`
+- [x] If not active, set update interval to `INTERVAL_SLOW`
+- [x] Return complete data dict
 
 ### Error Handling
-- [ ] Catch `BarcoConnectionError` and raise `UpdateFailed`
-- [ ] Catch `BarcoAuthError` and raise `ConfigEntryAuthFailed`
-- [ ] Catch `BarcoStateError` and return partial data (don't fail)
-- [ ] Catch generic `Exception` and raise `UpdateFailed`
+- [x] Catch `BarcoConnectionError` and raise `UpdateFailed`
+- [x] Catch `BarcoAuthError` and raise `ConfigEntryAuthFailed`
+- [x] Catch `BarcoStateError` and return partial data (don't fail)
+- [x] Catch generic `Exception` and raise `UpdateFailed`
 
 ### Properties
-- [ ] Add `@property def unique_id()` returning device serial number
-- [ ] Add `@property def device()` returning `BarcoDevice` instance
+- [x] Add `@property def unique_id()` returning device serial number
+- [x] Add `@property def device()` returning `BarcoDevice` instance
