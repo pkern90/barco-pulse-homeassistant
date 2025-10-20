@@ -1,220 +1,305 @@
-# Barco HDR CS Protocol Discovery - Summary
+# Barco Pulse Protocol Specification
 
-**Date:** October 18, 2025
-**Test Projector:** Barco HDR CS at 192.168.30.206
-**Serial Number:** 2590381267
+**Protocol Version:** JSON-RPC 2.0
+**Transport:** TCP Port 9090
+**Tested Models:** Barco HDR CS
+**Last Updated:** October 18, 2025
 
-## Issue Summary
+## Protocol Overview
 
-The initial API client implementation used standard JSON-RPC 2.0 over TCP with newline-delimited messages. The TCP connection succeeded, but the projector never responded to requests, resulting in timeout errors.
-
-## Root Cause
-
-The Barco HDR CS projector uses a **hybrid HTTP/0.9-style protocol**:
+Barco Pulse projectors use a **hybrid HTTP/0.9-style protocol** that combines modern HTTP requests with simplified responses:
 
 - **Request Format:** HTTP POST with JSON-RPC 2.0 payload (standard HTTP/1.1)
 - **Response Format:** Raw JSON **without HTTP response headers** (HTTP/0.9-like behavior)
 
+
 This is unusual because:
 1. Modern HTTP servers typically send full HTTP responses with status line and headers
 2. The projector accepts HTTP/1.1 POST requests but responds like HTTP/0.9 (raw content only)
-3. Standard HTTP libraries (like `aiohttp`) fail because they expect HTTP response headers
+3. Standard HTTP libraries (like `aiohttp` or `urllib`) may fail because they expect HTTP response headers
 
-## Discovery Process
+## Protocol Details
 
-### 1. Initial Symptoms
+### Connection
+
+- **Protocol:** TCP
+- **Port:** 9090 (default)
+- **Encoding:** UTF-8
+- **Format:** HTTP POST with JSON-RPC 2.0 payload
+
+### Request Format
+
+Requests must be sent as HTTP/1.1 POST requests with the following structure:
+
+```http
+POST / HTTP/1.1
+Host: <projector-ip>
+Content-Type: application/json
+Content-Length: <payload-length>
+
+<json-rpc-payload>
 ```
-✓ TCP connection to 192.168.30.206:9090 succeeds
-✗ Requests timeout - no response received
-✗ Background read loop receives no data
+
+**JSON-RPC 2.0 Payload Structure:**
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "<method-name>",
+  "params": {<parameters>},
+  "id": <request-id>
+}
 ```
 
-### 2. Working curl Command
-The user discovered this works:
+**Example Request:**
+```http
+POST / HTTP/1.1
+Host: 192.168.1.100
+Content-Type: application/json
+Content-Length: 93
+
+{"jsonrpc":"2.0","method":"property.get","params":{"property":"system.serialnumber"},"id":1}
+```
+
+### Response Format
+
+**Critical:** Responses contain **only raw JSON** without HTTP status line or headers (HTTP/0.9 behavior).
+
+**JSON-RPC 2.0 Response Structure:**
+```json
+{
+  "jsonrpc": "2.0",
+  "id": <request-id>,
+  "result": <result-value>
+}
+```
+
+**Error Response:**
+```json
+{
+  "jsonrpc": "2.0",
+  "id": <request-id>,
+  "error": {
+    "code": <error-code>,
+    "message": "<error-message>"
+  }
+}
+```
+
+**Example Response:**
+```json
+{"jsonrpc":"2.0","id":1,"result":"2590381267"}
+```
+
+## Testing the Protocol
+
+### Using curl
+
+The `--http0.9` flag is required to handle responses without HTTP headers:
+
 ```bash
 curl --http0.9 -X POST \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","method":"property.get","params":{"property":"system.serialnumber"},"id":1}' \
-  http://192.168.30.206:9090
+  http://<projector-ip>:9090
 ```
 
-The `--http0.9` flag was the critical clue!
+### Using Raw TCP Sockets
 
-### 3. Test Results
+Since standard HTTP libraries expect HTTP response headers, raw TCP sockets are recommended:
 
-**HTTP with aiohttp (Failed):**
+**Python Example (asyncio):**
 ```python
-async with session.post(url, json=request) as response:
-    result = await response.json()
-```
-Error: `400, message='Expected HTTP/...'`
+import asyncio
+import json
 
-**HTTP POST via TCP Socket (Success):**
-```python
-# Send HTTP POST request
-http_request = (
-    f"POST / HTTP/1.1\r\n"
-    f"Host: {host}\r\n"
-    f"Content-Type: application/json\r\n"
-    f"Content-Length: {len(json_data)}\r\n"
-    f"\r\n"
-    f"{json_data}"
-)
-writer.write(http_request.encode())
-await writer.drain()
-
-# Read raw JSON response (no HTTP headers)
-data = await reader.read(4096)
-json_text = data.decode()
-result = json.loads(json_text)
-```
-
-✅ **Response:** `{"jsonrpc":"2.0","id":1,"result":"2590381267"}`
-
-## Solution
-
-Use TCP sockets (`asyncio.open_connection`) to:
-1. **Send:** HTTP POST request with proper headers + JSON-RPC payload
-2. **Receive:** Raw JSON response (no HTTP header parsing)
-3. **Parse:** JSON directly from socket data
-
-## Implementation Requirements
-
-### Updated API Client Pattern
-
-```python
-class BarcoPulseApiClient:
-    async def connect(self):
-        self._reader, self._writer = await asyncio.open_connection(
-            self._host, self._port
-        )
-
-    async def _send_request(self, method: str, params: dict | None = None):
-        # Generate JSON-RPC request
-        request_id = self._next_id()
-        json_payload = json.dumps({
-            "jsonrpc": "2.0",
-            "method": method,
-            "params": params or {},
-            "id": request_id
-        })
-
-        # Build HTTP POST request
-        http_request = (
-            f"POST / HTTP/1.1\r\n"
-            f"Host: {self._host}\r\n"
-            f"Content-Type: application/json\r\n"
-            f"Content-Length: {len(json_payload)}\r\n"
-            f"\r\n"
-            f"{json_payload}"
-        )
-
-        # Send request
-        self._writer.write(http_request.encode())
-        await self._writer.drain()
-
-        # Read raw JSON response (no HTTP headers!)
-        response_data = await self._reader.read(8192)
-        response_json = json.loads(response_data.decode())
-
-        # Handle JSON-RPC response
-        if "error" in response_json:
-            raise BarcoPulseCommandError(response_json["error"]["message"])
-
-        return response_json.get("result")
+async def send_jsonrpc_request(host, method, params=None):
+    # Connect to projector
+    reader, writer = await asyncio.open_connection(host, 9090)
+    
+    # Build JSON-RPC request
+    request = {
+        "jsonrpc": "2.0",
+        "method": method,
+        "params": params or {},
+        "id": 1
+    }
+    json_payload = json.dumps(request)
+    
+    # Build HTTP POST request
+    http_request = (
+        f"POST / HTTP/1.1\r\n"
+        f"Host: {host}\r\n"
+        f"Content-Type: application/json\r\n"
+        f"Content-Length: {len(json_payload)}\r\n"
+        f"\r\n"
+        f"{json_payload}"
+    )
+    
+    # Send request
+    writer.write(http_request.encode())
+    await writer.drain()
+    
+    # Read raw JSON response (no HTTP headers)
+    response_data = await reader.read(8192)
+    response = json.loads(response_data.decode())
+    
+    # Cleanup
+    writer.close()
+    await writer.wait_closed()
+    
+    return response
 ```
 
-### Key Changes from Original Plan
+## Common API Methods
 
-| Original Design                              | Updated Design                              |
-| -------------------------------------------- | ------------------------------------------- |
-| Pure TCP with newline-delimited JSON         | TCP socket with HTTP POST headers           |
-| Background `_read_loop()` for async messages | Synchronous request/response per connection |
-| Parse JSON from readline()                   | Parse JSON from raw socket read()           |
-| Support notifications (no `id` field)        | Request/response only (always has `id`)     |
+### Property Access
 
-### Removed Features (for now)
-
-- **Background read loop** - Not needed for synchronous request/response
-- **Notification handling** - Unclear if HDR CS sends async notifications
-- **Request queue** - Single request at a time is simpler
-- **aiohttp dependency** - Can't use it due to HTTP/0.9 responses
-
-## Testing
-
-### Test Scripts Created
-
-1. **`scripts/test_http09.py`** - Validates HTTP POST + raw JSON response
-   ```bash
-   python3 scripts/test_http09.py 192.168.30.206
-   ```
-
-2. **`scripts/test_raw_connection.py`** - Raw TCP test
-3. **`scripts/test_projector_connection.py`** - High-level connection test
-4. **`scripts/test_http_jsonrpc.py`** - Failed aiohttp attempt (kept for reference)
-
-### Verified Working Commands
-
-```python
-# Get serial number
-{"jsonrpc":"2.0","method":"property.get","params":{"property":"system.serialnumber"},"id":1}
-→ {"jsonrpc":"2.0","id":1,"result":"2590381267"}
-
-# Introspect (API discovery)
-{"jsonrpc":"2.0","method":"introspect","params":{"object":"","recursive":true},"id":520}
-→ Returns full API structure
+**Get Property:**
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "property.get",
+  "params": {"property": "system.serialnumber"},
+  "id": 1
+}
 ```
 
-## Configuration Notes
-
-### Logger Configuration
-Fixed in `config/configuration.yaml`:
-```yaml
-logger:
-  default: info
-  logs:
-    custom_components.barco_pulse: debug  # Was: integration_blueprint
+**Set Property:**
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "property.set",
+  "params": {
+    "property": "image.window.main.source",
+    "value": "DisplayPort 1"
+  },
+  "id": 2
+}
 ```
 
-### Model Compatibility Considerations
+### Power Control
 
-- **Barco HDR CS:** Confirmed working with HTTP POST + raw JSON
-- **Other Barco Pulse models:** May use different protocols
-  - Standard TCP with newline-delimited JSON?
-  - Full HTTP with proper response headers?
+**Power On:**
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "system.poweron",
+  "params": {},
+  "id": 3
+}
+```
 
-**Recommendation:** Consider adding protocol detection or configuration option if supporting multiple Barco projector models in the future.
+**Power Off:**
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "system.poweroff",
+  "params": {},
+  "id": 4
+}
+```
 
-## Next Steps
+### API Discovery
 
-1. ✅ Update `plan.md` with protocol discovery findings
-2. ⏭️ Rewrite `api.py` to use HTTP POST + raw JSON pattern
-3. ⏭️ Test all API methods (power, properties, sources, etc.)
-4. ⏭️ Update coordinator to use new API client
-5. ⏭️ Test config flow with real projector
+**Introspect:**
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "introspect",
+  "params": {"object": "", "recursive": true},
+  "id": 5
+}
+```
 
-## Files Modified/Created
+Returns the complete API structure including all available methods and properties.
 
-### Documentation
-- ✅ `plan.md` - Updated Phase 2 with protocol details
-- ✅ `BARCO_HDR_CS_PROTOCOL.md` - This document
-- ✅ `config/configuration.yaml` - Fixed logger configuration
+## Authentication
 
-### Test Scripts
-- ✅ `scripts/test_http09.py` - Working HTTP POST + raw JSON test
-- ✅ `scripts/test_raw_connection.py` - Raw TCP test
-- ✅ `scripts/test_projector_connection.py` - Connection test
-- ✅ `scripts/test_auth_first.py` - Authentication test
-- ✅ `scripts/test_http_jsonrpc.py` - Failed aiohttp test
-- ✅ `scripts/README_MOCK.md` - Mock server docs (not needed for real projector)
-- ✅ `scripts/mock_projector.py` - Mock server (TCP-based, won't work for HDR CS)
+Some methods may require authentication:
 
-### To Be Modified
-- ⏭️ `custom_components/barco_pulse/api.py` - Rewrite for HTTP POST + raw JSON
-- ⏭️ `custom_components/barco_pulse/manifest.json` - Remove `aiohttp` dependency if added
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "authenticate",
+  "params": {"code": "12345"},
+  "id": 6
+}
+```
 
-## References
+The authentication code is typically a 5-digit PIN configured on the projector.
 
-- Barco Pulse API Documentation: `pulse-api-docs.md`
-- HTTP/0.9 Spec: Simple-Response format (no status line or headers)
-- curl `--http0.9` flag: Allows HTTP/0.9 servers (response without headers)
+## Implementation Considerations
+
+### Protocol Compatibility
+
+- **Standard HTTP Libraries:** Not recommended (expect HTTP response headers)
+- **Raw TCP Sockets:** Recommended approach for maximum control
+- **Connection Management:** Each request typically uses a new connection (stateless)
+
+### Error Handling
+
+1. **TCP Connection Errors:** Network issues, projector offline
+2. **JSON-RPC Errors:** Invalid method, missing parameters, authentication required
+3. **Timeout:** No response within expected timeframe (consider 5-10 second timeout)
+
+### Best Practices
+
+1. **Always close connections** after receiving response
+2. **Handle JSON parsing errors** gracefully
+3. **Implement retry logic** for transient network errors
+4. **Validate JSON-RPC responses** (check for `error` field)
+5. **Use unique request IDs** to correlate responses (though single request/response pattern is typical)
+
+## Model Variations
+
+**Note:** This protocol description is based on testing with the Barco HDR CS model. Other Barco Pulse projector models may use:
+
+- Standard HTTP with full response headers
+- Pure TCP with newline-delimited JSON
+- WebSocket-based communication
+
+Always test protocol behavior with your specific projector model.
+
+## Related Documentation
+
+- **Barco Pulse API Reference:** See `pulse-api-docs.md` for complete method and property documentation
+- **HDR CS State Properties:** See `HDR_CS_STATE_DEPENDENT_PROPERTIES.md` for state-dependent behavior
+- **JSON-RPC 2.0 Specification:** https://www.jsonrpc.org/specification
+- **HTTP/0.9 Reference:** Simple-Response format (body only, no headers)
+
+## Appendix: Troubleshooting
+
+### Symptom: Connection succeeds but no response
+
+**Cause:** Not sending HTTP POST headers, or using standard HTTP library that can't parse headerless response
+
+**Solution:** Use raw TCP sockets with HTTP POST request format
+
+### Symptom: `400 Bad Request` or `Expected HTTP/...` error
+
+**Cause:** HTTP library (e.g., aiohttp) trying to parse response as HTTP but receiving raw JSON
+
+**Solution:** Switch to raw TCP socket implementation
+
+### Symptom: JSON parsing error
+
+**Cause:** Partial response read, or response contains HTTP headers you're not stripping
+
+**Solution:** 
+- Ensure reading enough bytes (4096-8192 typical)
+- Verify response is pure JSON (no HTTP headers)
+- Check for complete JSON objects (balanced braces)
+
+### Symptom: Timeout on all requests
+
+**Possible Causes:**
+1. Wrong port (verify 9090)
+2. Projector requires authentication first
+3. Network firewall blocking connection
+4. Projector in deep standby mode (may need wake-on-LAN or physical power on)
+
+**Debugging Steps:**
+1. Test with `curl --http0.9` command
+2. Verify TCP connection with `telnet <ip> 9090`
+3. Try `introspect` method to validate basic connectivity
+4. Check projector network settings and authentication requirements
