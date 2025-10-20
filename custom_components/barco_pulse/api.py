@@ -339,7 +339,7 @@ class BarcoDevice:
             Property value
 
         """
-        return await self._send_request("property.get", {"name": property_name})
+        return await self._send_request("property.get", {"property": property_name})
 
     async def get_properties(self, property_names: list[str]) -> dict[str, Any]:
         """
@@ -352,12 +352,14 @@ class BarcoDevice:
             Dictionary mapping property names to values
 
         """
-        # Use batch property.get
-        result = await self._send_request("property.get", {"name": property_names})
+        # Use batch property.get - API returns dict when array is passed
+        result = await self._send_request("property.get", {"property": property_names})
 
-        # Convert list of results to dict
-        if isinstance(result, list):
-            return dict(zip(property_names, result, strict=False))
+        # When an array of properties is requested, result is a dict
+        if isinstance(result, dict):
+            return result
+
+        # Fallback for single property (shouldn't happen with list input)
         return {property_names[0]: result}
 
     async def set_property(self, property_name: str, value: Any) -> None:
@@ -370,7 +372,7 @@ class BarcoDevice:
 
         """
         await self._send_request(
-            "property.set", {"name": property_name, "value": value}
+            "property.set", {"property": property_name, "value": value}
         )
 
     async def get_source(self) -> str:
