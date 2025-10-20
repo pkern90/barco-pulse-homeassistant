@@ -30,5 +30,64 @@
             "reconfigure_successful": "Reconfiguration successful.",
             "reconfigure_failed": "Reconfiguration failed. Please try again."
         }
+    },
+    "entity": {
+        "binary_sensor": {
+            "power": {
+                "name": "Power"
+            }
+        },
+        "sensor": {
+            "state": {
+                "name": "State"
+            },
+            "serial_number": {
+                "name": "Serial Number"
+            },
+            "model": {
+                "name": "Model"
+            },
+            "firmware_version": {
+                "name": "Firmware"
+            },
+            "laser_power": {
+                "name": "Laser Power"
+            },
+            "source": {
+                "name": "Current Source"
+            }
+        },
+        "switch": {
+            "power": {
+                "name": "Power"
+            }
+        },
+        "select": {
+            "source": {
+                "name": "Input Source"
+            }
+        },
+        "number": {
+            "laser_power": {
+                "name": "Laser Power"
+            },
+            "brightness": {
+                "name": "Brightness"
+            },
+            "contrast": {
+                "name": "Contrast"
+            },
+            "saturation": {
+                "name": "Saturation"
+            },
+            "hue": {
+                "name": "Hue"
+            }
+        },
+        "remote": {
+            "remote": {
+                "name": "Remote Control"
+            }
+        }
     }
 }

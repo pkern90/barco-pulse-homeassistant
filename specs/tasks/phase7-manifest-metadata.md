@@ -3,79 +3,79 @@
 ## 7.1 Manifest (`custom_components/barco_pulse/manifest.json`)
 
 ### Required Fields
-- [ ] Set `"domain": "barco_pulse"`
-- [ ] Set `"name": "Barco Pulse"`
-- [ ] Set `"codeowners": ["@pkern90"]`
-- [ ] Set `"config_flow": true`
-- [ ] Set `"integration_type": "device"`
-- [ ] Set `"iot_class": "local_polling"`
-- [ ] Set `"version": "1.0.0"`
+- [x] Set `"domain": "barco_pulse"`
+- [x] Set `"name": "Barco Pulse"`
+- [x] Set `"codeowners": ["@pkern90"]`
+- [x] Set `"config_flow": true`
+- [x] Set `"integration_type": "device"`
+- [x] Set `"iot_class": "local_polling"`
+- [x] Set `"version": "1.0.0"`
 
 ### Documentation and Support
-- [ ] Set `"documentation": "https://github.com/pkern90/barco-pulse-homeassistant"`
-- [ ] Set `"issue_tracker": "https://github.com/pkern90/barco-pulse-homeassistant/issues"`
+- [x] Set `"documentation": "https://github.com/pkern90/barco-pulse-homeassistant"`
+- [x] Set `"issue_tracker": "https://github.com/pkern90/barco-pulse-homeassistant/issues"`
 
 ### Dependencies
-- [ ] Set `"requirements": []` (no external dependencies)
-- [ ] Verify no other dependencies needed
+- [x] Set `"requirements": []` (no external dependencies)
+- [x] Verify no other dependencies needed
 
 ## 7.2 Translations (`custom_components/barco_pulse/translations/en.json`)
 
 ### Config Flow Translations
-- [ ] Create `config` section
-- [ ] Add `step.user.title`: "Connect to Barco Pulse Projector"
-- [ ] Add `step.user.description`: Connection instructions
-- [ ] Add `step.user.data.host`: "Host (IP address)"
-- [ ] Add `step.user.data.port`: "Port"
-- [ ] Add `step.user.data.auth_code`: "Authentication Code (optional)"
-- [ ] Add `step.reconfigure.title`: "Reconfigure Barco Pulse Projector"
-- [ ] Add `step.reconfigure.description`: Update instructions
-- [ ] Add reconfigure data fields (same as user)
+- [x] Create `config` section
+- [x] Add `step.user.title`: "Connect to Barco Pulse Projector"
+- [x] Add `step.user.description`: Connection instructions
+- [x] Add `step.user.data.host`: "Host (IP address)"
+- [x] Add `step.user.data.port`: "Port"
+- [x] Add `step.user.data.auth_code`: "Authentication Code (optional)"
+- [x] Add `step.reconfigure.title`: "Reconfigure Barco Pulse Projector"
+- [x] Add `step.reconfigure.description`: Update instructions
+- [x] Add reconfigure data fields (same as user)
 
 ### Error Messages
-- [ ] Add `error.cannot_connect`: "Cannot connect to projector. Check host and port."
-- [ ] Add `error.invalid_auth`: "Invalid authentication code."
-- [ ] Add `error.unknown`: "Unexpected error occurred."
+- [x] Add `error.cannot_connect`: "Cannot connect to projector. Check host and port."
+- [x] Add `error.invalid_auth`: "Invalid authentication code."
+- [x] Add `error.unknown`: "Unexpected error occurred."
 
 ### Abort Messages
-- [ ] Add `abort.already_configured`: "This projector is already configured."
-- [ ] Add `abort.reconfigure_successful`: "Configuration updated successfully."
+- [x] Add `abort.already_configured`: "This projector is already configured."
+- [x] Add `abort.reconfigure_successful`: "Configuration updated successfully."
 
 ### Binary Sensor Translations
-- [ ] Add `entity.binary_sensor.power.name`: "Power"
+- [x] Add `entity.binary_sensor.power.name`: "Power"
 
 ### Sensor Translations
-- [ ] Add `entity.sensor.state.name`: "State"
-- [ ] Add `entity.sensor.serial_number.name`: "Serial Number"
-- [ ] Add `entity.sensor.model_name.name`: "Model"
-- [ ] Add `entity.sensor.firmware_version.name`: "Firmware"
-- [ ] Add `entity.sensor.laser_power.name`: "Laser Power"
-- [ ] Add `entity.sensor.source.name`: "Current Source"
+- [x] Add `entity.sensor.state.name`: "State"
+- [x] Add `entity.sensor.serial_number.name`: "Serial Number"
+- [x] Add `entity.sensor.model_name.name`: "Model"
+- [x] Add `entity.sensor.firmware_version.name`: "Firmware"
+- [x] Add `entity.sensor.laser_power.name`: "Laser Power"
+- [x] Add `entity.sensor.source.name`: "Current Source"
 
 ### Switch Translations
-- [ ] Add `entity.switch.power.name`: "Power"
+- [x] Add `entity.switch.power.name`: "Power"
 
 ### Select Translations
-- [ ] Add `entity.select.source.name`: "Input Source"
+- [x] Add `entity.select.source.name`: "Input Source"
 
 ### Number Translations
-- [ ] Add `entity.number.laser_power.name`: "Laser Power"
-- [ ] Add `entity.number.brightness.name`: "Brightness"
-- [ ] Add `entity.number.contrast.name`: "Contrast"
-- [ ] Add `entity.number.saturation.name`: "Saturation"
-- [ ] Add `entity.number.hue.name`: "Hue"
+- [x] Add `entity.number.laser_power.name`: "Laser Power"
+- [x] Add `entity.number.brightness.name`: "Brightness"
+- [x] Add `entity.number.contrast.name`: "Contrast"
+- [x] Add `entity.number.saturation.name`: "Saturation"
+- [x] Add `entity.number.hue.name`: "Hue"
 
 ### Remote Translations
-- [ ] Add `entity.remote.remote.name`: "Remote Control"
+- [x] Add `entity.remote.remote.name`: "Remote Control"
 
 ## 7.3 Strings (`custom_components/barco_pulse/strings.json`)
 
 ### Copy Translations
-- [ ] Copy entire content from `translations/en.json`
-- [ ] Ensure exact match for backward compatibility
+- [x] Copy entire content from `translations/en.json`
+- [x] Ensure exact match for backward compatibility
 
 ## 7.4 Services (Optional - `custom_components/barco_pulse/services.yaml`)
 
 ### Service Definitions
-- [ ] Skip for initial implementation
-- [ ] Can add custom services later if needed (e.g., lens memory, test patterns)
+- [x] Skip for initial implementation
+- [x] Can add custom services later if needed (e.g., lens memory, test patterns)

@@ -1,0 +1,14 @@
+{
+    "domain": "barco_pulse",
+    "name": "Barco Pulse",
+    "codeowners": [
+        "@pkern90"
+    ],
+    "config_flow": true,
+    "documentation": "https://github.com/pkern90/barco-pulse-homeassistant",
+    "integration_type": "device",
+    "iot_class": "local_polling",
+    "issue_tracker": "https://github.com/pkern90/barco-pulse-homeassistant/issues",
+    "requirements": [],
+    "version": "1.0.0"
+}
