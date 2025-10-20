@@ -1,9 +1,0 @@
-#!/usr/bin/env bash
-# Run tests for Barco Pulse Home Assistant integration
-
-set -e
-
-cd "$(dirname "$0")/.."
-
-echo "Running tests with pytest..."
-python -m pytest tests/ -v "$@"
