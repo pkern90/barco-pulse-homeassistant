@@ -126,6 +126,21 @@ class BarcoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         except BarcoStateError:
             _LOGGER.debug("Hue not available in current state")
 
+        # Preset assignments and profiles
+        try:
+            preset_assignments = await self.device.get_preset_assignments()
+            data["preset_assignments"] = preset_assignments
+            # Create list of available presets (only those with assigned profiles)
+            data["available_presets"] = sorted(preset_assignments.keys())
+        except BarcoStateError:
+            _LOGGER.debug("Preset assignments not available in current state")
+
+        try:
+            profiles = await self.device.get_profiles()
+            data["profiles"] = profiles
+        except BarcoStateError:
+            _LOGGER.debug("Profiles not available in current state")
+
         return data
 
     async def _async_update_data(self) -> dict[str, Any]:

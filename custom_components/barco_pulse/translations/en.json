@@ -65,6 +65,9 @@
         "select": {
             "source": {
                 "name": "Input Source"
+            },
+            "preset": {
+                "name": "Preset"
             }
         },
         "number": {

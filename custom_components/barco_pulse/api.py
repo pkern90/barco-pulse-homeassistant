@@ -92,7 +92,7 @@ class BarcoDevice:
     def _build_jsonrpc_request(
         self,
         method: str,
-        params: dict[str, Any] | list[Any] | None = None,
+        params: Any = None,
         request_id: int | None = None,
     ) -> dict[str, Any]:
         """
@@ -100,7 +100,7 @@ class BarcoDevice:
 
         Args:
             method: JSON-RPC method name
-            params: Method parameters (dict or list)
+            params: Method parameters (dict, list, or any JSON-serializable value)
             request_id: Request ID (if None, creates a notification)
 
         Returns:
@@ -232,14 +232,14 @@ class BarcoDevice:
     async def _send_request(
         self,
         method: str,
-        params: dict[str, Any] | list[Any] | None = None,
+        params: Any = None,
     ) -> Any:
         """
         Send JSON-RPC request and return result.
 
         Args:
             method: JSON-RPC method name
-            params: Method parameters
+            params: Method parameters (dict, list, or any JSON-serializable value)
 
         Returns:
             Result from JSON-RPC response
@@ -555,3 +555,89 @@ class BarcoDevice:
         """
         result = await self.get_property("system.firmwareversion")
         return str(result)
+
+    async def get_preset_assignments(self) -> dict[int, str]:
+        """
+        Get all preset assignments (preset number -> profile name mapping).
+
+        Returns:
+            Dictionary mapping preset numbers to profile names
+
+        Raises:
+            BarcoStateError: If projector not in active state
+
+        """
+        result = await self.get_property("profile.presetassignments")
+        if not isinstance(result, dict):
+            return {}
+        # Convert string keys to integers
+        return {int(k): v for k, v in result.items()}
+
+    async def get_profiles(self) -> list[str]:
+        """
+        Get list of available profile names.
+
+        Returns:
+            List of profile names
+
+        Raises:
+            BarcoStateError: If projector not in active state
+
+        """
+        result = await self.get_property("profile.profiles")
+        if not isinstance(result, list):
+            return []
+        return result
+
+    async def activate_preset(self, preset: int) -> bool:
+        """
+        Activate a preset by number.
+
+        Args:
+            preset: Preset number to activate
+
+        Returns:
+            True if activation successful
+
+        Raises:
+            BarcoStateError: If projector not in active state
+            BarcoApiError: If preset not assigned or invalid
+
+        """
+        result = await self._send_request("profile.activatepreset", preset)
+        return bool(result)
+
+    async def activate_profile(self, name: str) -> bool:
+        """
+        Activate a profile by name.
+
+        Args:
+            name: Profile name to activate
+
+        Returns:
+            True if activation successful
+
+        Raises:
+            BarcoStateError: If projector not in active state
+            BarcoApiError: If profile not found
+
+        """
+        result = await self._send_request("profile.activateprofile", name)
+        return bool(result)
+
+    async def get_profile_for_preset(self, preset: int) -> str:
+        """
+        Get the profile name assigned to a preset.
+
+        Args:
+            preset: Preset number
+
+        Returns:
+            Profile name (empty string if unassigned)
+
+        Raises:
+            BarcoStateError: If projector not in active state
+
+        """
+        result = await self._send_request("profile.profileforpreset", preset)
+        return str(result) if result else ""

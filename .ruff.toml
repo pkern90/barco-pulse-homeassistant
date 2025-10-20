@@ -49,6 +49,13 @@ max-statements = 60
     "ARG002",  # Allow unused method arguments in scripts
     "TRY300",  # Allow return in try block in scripts
 ]
+"examples/*" = [
+    "T201",    # Allow print statements in examples
+    "ANN201",  # Allow missing return type annotations in examples
+    "ANN001",  # Allow missing type annotations for function arguments in examples
+    "D401",    # Allow non-imperative docstrings in examples
+    "E501",    # Allow long lines in examples
+]
 "tests/*" = [
     "S101",    # Allow assert statements in tests
     "SLF001",  # Allow accessing private members in tests
