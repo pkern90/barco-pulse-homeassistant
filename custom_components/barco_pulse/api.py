@@ -111,6 +111,59 @@ class BarcoPulseApiClient:
         self._validated = False
         _LOGGER.debug("Disconnected from %s:%d", self._host, self._port)
 
+    def _build_json_rpc_request(
+        self, method: str, params: dict[str, Any] | None
+    ) -> dict[str, Any]:
+        """Build a JSON-RPC 2.0 request."""
+        self._request_id += 1
+        request: dict[str, Any] = {
+            "jsonrpc": "2.0",
+            "method": method,
+            "id": self._request_id,
+        }
+        if params is not None:
+            request["params"] = params
+        return request
+
+    def _log_request(self, request: dict[str, Any], method: str) -> None:
+        """Log request with sensitive data redacted."""
+        log_request = request.copy()
+        if method == "authenticate" and "params" in log_request:
+            log_params = log_request["params"].copy()
+            log_params["code"] = "REDACTED"
+            log_request["params"] = log_params
+        _LOGGER.debug("Sending request: %s", log_request)
+
+    def _parse_response(self, response_text: str) -> dict[str, Any]:
+        """Parse JSON-RPC response from text (with optional HTTP headers)."""
+        # Extract JSON (skip HTTP headers if present)
+        json_start = response_text.find("{")
+        if json_start < 0:
+            msg = f"No JSON in response: {response_text[:100]}"
+            raise BarcoPulseCommandError(msg)
+
+        json_text = response_text[json_start:]
+        return json.loads(json_text)
+
+    def _handle_json_rpc_response(self, message: dict[str, Any]) -> Any:
+        """Handle JSON-RPC response and extract result."""
+        _LOGGER.debug("Received response: %s", message)
+
+        # Check for JSON-RPC error
+        if "error" in message:
+            error = message["error"]
+            error_code = error.get("code")
+            error_message = error.get("message", "Unknown error")
+            _LOGGER.error("JSON-RPC error %s: %s", error_code, error_message)
+            raise BarcoPulseCommandError(error_message, error_code)
+
+        # Return result
+        if "result" in message:
+            return message["result"]
+
+        msg = "Invalid response: missing result or error"
+        raise BarcoPulseCommandError(msg)
+
     async def _send_request(
         self, method: str, params: dict[str, Any] | None = None
     ) -> Any:
@@ -135,26 +188,9 @@ class BarcoPulseApiClient:
 
         """
         async with self._lock:
-            # Generate request ID
-            self._request_id += 1
-            request_id = self._request_id
-
             # Build JSON-RPC request
-            request: dict[str, Any] = {
-                "jsonrpc": "2.0",
-                "method": method,
-                "id": request_id,
-            }
-            if params is not None:
-                request["params"] = params
-
-            # Log request (redact auth code)
-            log_request = request.copy()
-            if method == "authenticate" and "params" in log_request:
-                log_params = log_request["params"].copy()
-                log_params["code"] = "REDACTED"
-                log_request["params"] = log_params
-            _LOGGER.debug("Sending request: %s", log_request)
+            request = self._build_json_rpc_request(method, params)
+            self._log_request(request, method)
 
             try:
                 # Open TCP connection
@@ -185,32 +221,9 @@ class BarcoPulseApiClient:
                     )
                     response_text = data.decode("utf-8")
 
-                    # Extract JSON (skip HTTP headers if present)
-                    json_start = response_text.find("{")
-                    if json_start < 0:
-                        msg = f"No JSON in response: {response_text[:100]}"
-                        raise BarcoPulseCommandError(msg)
-
-                    json_text = response_text[json_start:]
-                    message = json.loads(json_text)
-                    _LOGGER.debug("Received response: %s", message)
-
-                    # Check for JSON-RPC error
-                    if "error" in message:
-                        error = message["error"]
-                        error_code = error.get("code")
-                        error_message = error.get("message", "Unknown error")
-                        _LOGGER.error(
-                            "JSON-RPC error %s: %s", error_code, error_message
-                        )
-                        raise BarcoPulseCommandError(error_message, error_code)
-
-                    # Return result
-                    if "result" in message:
-                        return message["result"]
-
-                    msg = "Invalid response: missing result or error"
-                    raise BarcoPulseCommandError(msg)
+                    # Parse and handle response
+                    message = self._parse_response(response_text)
+                    return self._handle_json_rpc_response(message)
 
                 finally:
                     # Always close connection

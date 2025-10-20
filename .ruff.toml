@@ -23,3 +23,40 @@ keep-runtime-typing = true
 
 [lint.mccabe]
 max-complexity = 25
+
+[lint.pylint]
+max-statements = 60
+
+# Per-directory overrides for scripts and tests
+[lint.per-file-ignores]
+"scripts/*" = [
+    "T201",    # Allow print statements in scripts
+    "ANN201",  # Allow missing return type annotations in scripts
+    "ANN001",  # Allow missing type annotations for function arguments in scripts
+    "ANN204",  # Allow missing return type annotations for special methods in scripts
+    "D401",    # Allow non-imperative docstrings in scripts
+    "PT028",   # Don't enforce pytest function parameter defaults in scripts
+    "PLR2004", # Allow magic values in scripts
+    "PLC0415", # Allow imports not at top level in scripts
+    "BLE001",  # Allow catching blind exceptions in scripts
+    "TRY401",  # Allow redundant exception info in logging in scripts
+    "PLR0911", # Allow more return statements in scripts
+    "PLR0915", # Allow more statements in scripts
+    "S104",    # Allow binding to all interfaces in scripts
+    "ERA001",  # Allow commented-out code in scripts
+    "RUF001",  # Allow ambiguous unicode characters in scripts
+    "E501",    # Allow long lines in scripts
+    "ARG002",  # Allow unused method arguments in scripts
+    "TRY300",  # Allow return in try block in scripts
+]
+"tests/*" = [
+    "S101",    # Allow assert statements in tests
+    "SLF001",  # Allow accessing private members in tests
+    "ARG001",  # Allow unused function arguments in tests (fixtures)
+    "ANN001",  # Allow missing type annotations in tests
+    "PLC0415", # Allow imports not at top level in tests
+    "TC002",   # Allow third-party imports without type-checking block in tests
+    "PLR2004", # Allow magic values in tests
+    "E501",    # Allow long lines in tests
+    "TRY300",  # Allow return in try block in tests
+]
