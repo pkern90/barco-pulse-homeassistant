@@ -37,9 +37,41 @@ A custom Home Assistant integration for controlling Barco Pulse projectors.
 - **Binary Sensors**: Connection status, signal detection
 - **Sensors**: Power state, runtime hours, temperature
 - **Switches**: Power control
-- **Select**: Input source selection
+- **Select**: Input source selection, preset activation, profile activation
 - **Number**: Illumination power, picture adjustments
-- **Remote**: Send remote control commands
+- **Remote**: Send remote control commands (compatible with Unfolded Circle Remote 3)
+
+## Unfolded Circle Remote 3 Support
+
+This integration is fully compatible with the **Unfolded Circle Remote 3**! The `remote.barco_pulse_remote` entity supports:
+
+- Power control (on/off)
+- Input source switching (`source_HDMI 1`, etc.)
+- Preset activation (`preset_0` through `preset_29`)
+- Profile activation (`profile_Cinema`, `profile_Gaming`, etc.)
+
+**Quick Start**:
+```yaml
+# Activate Cinema preset
+service: remote.send_command
+target:
+  entity_id: remote.barco_pulse_remote
+data:
+  command: preset_1
+
+# Switch to HDMI 1 and activate Gaming profile
+service: remote.send_command
+target:
+  entity_id: remote.barco_pulse_remote
+data:
+  command:
+    - source_HDMI 1
+    - profile_Gaming
+```
+
+📖 **See**: [`UNFOLDED_CIRCLE_REMOTE_INTEGRATION.md`](UNFOLDED_CIRCLE_REMOTE_INTEGRATION.md) for complete UC Remote setup guide
+
+🚀 **Quick Reference**: [`UC_REMOTE_QUICK_REFERENCE.md`](UC_REMOTE_QUICK_REFERENCE.md) for command examples
 
 ## Requirements
 

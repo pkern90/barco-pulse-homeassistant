@@ -55,6 +55,9 @@ max-statements = 60
     "ANN001",  # Allow missing type annotations for function arguments in examples
     "D401",    # Allow non-imperative docstrings in examples
     "E501",    # Allow long lines in examples
+    "INP001",  # Allow implicit namespace packages in examples
+    "PLR2004", # Allow magic values in examples
+    "PLR0915", # Allow many statements in examples
 ]
 "tests/*" = [
     "S101",    # Allow assert statements in tests

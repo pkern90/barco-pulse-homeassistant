@@ -46,12 +46,31 @@ class BarcoRemote(BarcoEntity, RemoteEntity):
         await self.coordinator.async_request_refresh()
 
     async def async_send_command(self, command: Iterable[str], **_kwargs: Any) -> None:
-        """Send a command to the projector."""
+        """
+        Send a command to the projector.
+
+        Supported command formats:
+        - source_<name>: Switch to input source (e.g., "source_HDMI 1")
+        - preset_<number>: Activate preset by number (e.g., "preset_5")
+        - profile_<name>: Activate profile by name (e.g., "profile_Cinema")
+        """
         for cmd in command:
             if cmd.startswith("source_"):
                 # Extract source name from command (e.g., "source_HDMI 1" -> "HDMI 1")
                 source_name = cmd[7:]  # Remove "source_" prefix
                 await self.coordinator.device.set_source(source_name)
+            elif cmd.startswith("preset_"):
+                # Extract preset number (e.g., "preset_5" -> 5)
+                try:
+                    preset_num = int(cmd[7:])  # Remove "preset_" prefix
+                    await self.coordinator.device.activate_preset(preset_num)
+                except (ValueError, IndexError):
+                    # Log but don't fail if preset number is invalid
+                    pass
+            elif cmd.startswith("profile_"):
+                # Extract profile name (e.g., "profile_Cinema" -> "Cinema")
+                profile_name = cmd[8:]  # Remove "profile_" prefix
+                await self.coordinator.device.activate_profile(profile_name)
 
         await self.coordinator.async_request_refresh()
 
