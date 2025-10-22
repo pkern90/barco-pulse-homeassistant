@@ -27,6 +27,7 @@ POWER_STATES_STANDBY = ["standby", "eco", "boot"]
 
 # API constants
 PRESET_ASSIGNMENT_TUPLE_SIZE = 2  # [preset_num, profile_name]
+PRESET_MAX_NUMBER = 29  # Presets range from 0 to 29 (30 total)
 
 # Entity attribute keys
 ATTR_LASER_POWER = "laser_power"

@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import logging
 import time
 from typing import TYPE_CHECKING, Any
@@ -40,7 +41,7 @@ class BarcoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     config_entry: ConfigEntry
 
     def __init__(self, hass: HomeAssistant, device: BarcoDevice) -> None:
-        """Initialize the coordinator."""
+        """Initialize the coordinator with fallback unique_id."""
         super().__init__(
             hass=hass,
             logger=_LOGGER,
@@ -51,6 +52,10 @@ class BarcoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._connection_lock = asyncio.Lock()
         self._update_lock = asyncio.Lock()
         self._last_update = 0.0
+        # Generate stable fallback ID immediately (never None)
+        self._fallback_id = hashlib.md5(  # noqa: S324
+            f"{device.host}:{device.port}".encode()
+        ).hexdigest()[:16]
 
     async def _enforce_rate_limit(self) -> None:
         """Enforce minimum 1-second interval between updates."""
@@ -184,8 +189,8 @@ class BarcoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 raise UpdateFailed(f"Unexpected error: {err}") from err
 
     @property
-    def unique_id(self) -> str | None:
-        """Return unique ID for this coordinator."""
-        if self.data:
-            return self.data.get("serial_number")
-        return None
+    def unique_id(self) -> str:
+        """Return unique ID for this coordinator, never None."""
+        if self.data and self.data.get("serial_number"):
+            return self.data["serial_number"]
+        return self._fallback_id

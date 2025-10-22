@@ -12,63 +12,63 @@
 **Estimated Time**: 2 hours
 
 ### Problem
-- [ ] All 12 entity command methods lack exception handling
-- [ ] Unhandled exceptions propagate to HA core causing crashes
-- [ ] User actions can leave inconsistent state
+- [x] All 12 entity command methods lack exception handling
+- [x] Unhandled exceptions propagate to HA core causing crashes
+- [x] User actions can leave inconsistent state
 
 ### Affected Methods
-- [ ] `switch.py`: `async_turn_on`
-- [ ] `switch.py`: `async_turn_off`
-- [ ] `number.py`: `async_set_native_value` (×5 entities)
-- [ ] `select.py`: `async_select_option` (×3 entities)
-- [ ] `remote.py`: `async_turn_on`
-- [ ] `remote.py`: `async_turn_off`
-- [ ] `remote.py`: `async_send_command`
+- [x] `switch.py`: `async_turn_on`
+- [x] `switch.py`: `async_turn_off`
+- [x] `number.py`: `async_set_native_value` (×5 entities)
+- [x] `select.py`: `async_select_option` (×3 entities)
+- [x] `remote.py`: `async_turn_on`
+- [x] `remote.py`: `async_turn_off`
+- [x] `remote.py`: `async_send_command`
 
 ### Implementation Checklist
 
 #### switch.py
-- [ ] Add import: `from homeassistant.exceptions import HomeAssistantError`
-- [ ] Wrap `async_turn_on` in try/except block
-- [ ] Handle `BarcoStateError` with warning log
-- [ ] Handle `BarcoConnectionError` with error log
-- [ ] Handle generic exceptions
-- [ ] Wrap `async_turn_off` in try/except block
-- [ ] Handle `BarcoStateError` with warning log
-- [ ] Handle `BarcoConnectionError` with error log
-- [ ] Handle generic exceptions
+- [x] Add import: `from homeassistant.exceptions import HomeAssistantError`
+- [x] Wrap `async_turn_on` in try/except block
+- [x] Handle `BarcoStateError` with warning log
+- [x] Handle `BarcoConnectionError` with error log
+- [x] Handle generic exceptions
+- [x] Wrap `async_turn_off` in try/except block
+- [x] Handle `BarcoStateError` with warning log
+- [x] Handle `BarcoConnectionError` with error log
+- [x] Handle generic exceptions
 
 #### number.py
-- [ ] Add import: `from homeassistant.exceptions import HomeAssistantError`
-- [ ] Update `async_set_native_value` for laser power entity
-- [ ] Handle `BarcoStateError` in laser power
-- [ ] Handle `BarcoConnectionError` in laser power
-- [ ] Update `async_set_native_value` for brightness entity
-- [ ] Handle errors in brightness entity
-- [ ] Update `async_set_native_value` for contrast entity
-- [ ] Handle errors in contrast entity
-- [ ] Update `async_set_native_value` for saturation entity
-- [ ] Handle errors in saturation entity
-- [ ] Update `async_set_native_value` for hue entity
-- [ ] Handle errors in hue entity
+- [x] Add import: `from homeassistant.exceptions import HomeAssistantError`
+- [x] Update `async_set_native_value` for laser power entity
+- [x] Handle `BarcoStateError` in laser power
+- [x] Handle `BarcoConnectionError` in laser power
+- [x] Update `async_set_native_value` for brightness entity
+- [x] Handle errors in brightness entity
+- [x] Update `async_set_native_value` for contrast entity
+- [x] Handle errors in contrast entity
+- [x] Update `async_set_native_value` for saturation entity
+- [x] Handle errors in saturation entity
+- [x] Update `async_set_native_value` for hue entity
+- [x] Handle errors in hue entity
 
 #### select.py
-- [ ] Add import: `from homeassistant.exceptions import HomeAssistantError`
-- [ ] Update `async_select_option` for source entity
-- [ ] Handle errors in source entity
-- [ ] Update `async_select_option` for preset entity
-- [ ] Handle errors in preset entity
-- [ ] Update `async_select_option` for profile entity
-- [ ] Handle errors in profile entity
+- [x] Add import: `from homeassistant.exceptions import HomeAssistantError`
+- [x] Update `async_select_option` for source entity
+- [x] Handle errors in source entity
+- [x] Update `async_select_option` for preset entity
+- [x] Handle errors in preset entity
+- [x] Update `async_select_option` for profile entity
+- [x] Handle errors in profile entity
 
 #### remote.py
-- [ ] Add import: `from homeassistant.exceptions import HomeAssistantError`
-- [ ] Wrap `async_turn_on` in try/except
-- [ ] Handle all error types in turn_on
-- [ ] Wrap `async_turn_off` in try/except
-- [ ] Handle all error types in turn_off
-- [ ] Wrap `async_send_command` in try/except
-- [ ] Handle all error types in send_command
+- [x] Add import: `from homeassistant.exceptions import HomeAssistantError`
+- [x] Wrap `async_turn_on` in try/except
+- [x] Handle all error types in turn_on
+- [x] Wrap `async_turn_off` in try/except
+- [x] Handle all error types in turn_off
+- [x] Wrap `async_send_command` in try/except
+- [x] Handle all error types in send_command
 
 ### Error Handling Pattern
 ```python
@@ -89,13 +89,13 @@ async def async_<command>(self, ...) -> None:
 ```
 
 ### Verification
-- [ ] `scripts/lint` passes
-- [ ] All 12 methods have try/except blocks
-- [ ] All methods handle BarcoStateError
-- [ ] All methods handle BarcoConnectionError
-- [ ] All methods handle generic Exception
-- [ ] All methods log errors appropriately
-- [ ] All methods raise HomeAssistantError to user
+- [x] `scripts/lint` passes
+- [x] All 12 methods have try/except blocks
+- [x] All methods handle BarcoStateError
+- [x] All methods handle BarcoConnectionError
+- [x] All methods handle generic Exception
+- [x] All methods log errors appropriately
+- [x] All methods raise HomeAssistantError to user
 - [ ] Test with projector off (BarcoStateError)
 - [ ] Test with network disconnected (BarcoConnectionError)
 
@@ -107,17 +107,17 @@ async def async_<command>(self, ...) -> None:
 **Estimated Time**: 30 minutes
 
 ### Problem
-- [ ] `unique_id` property returns None before first successful refresh
-- [ ] Entity unique_ids become "None_suffix" causing registry corruption
-- [ ] Unstable entity IDs across restarts
+- [x] `unique_id` property returns None before first successful refresh
+- [x] Entity unique_ids become "None_suffix" causing registry corruption
+- [x] Unstable entity IDs across restarts
 
 ### Implementation Checklist
-- [ ] Add `_fallback_id` field to `__init__`
-- [ ] Generate stable fallback ID using hashlib.md5
-- [ ] Use `f"{device.host}:{device.port}"` as input
-- [ ] Truncate hash to 16 characters
-- [ ] Update `unique_id` property to return fallback if serial_number not available
-- [ ] Ensure `unique_id` never returns None
+- [x] Add `_fallback_id` field to `__init__`
+- [x] Generate stable fallback ID using hashlib.md5
+- [x] Use `f"{device.host}:{device.port}"` as input
+- [x] Truncate hash to 16 characters
+- [x] Update `unique_id` property to return fallback if serial_number not available
+- [x] Ensure `unique_id` never returns None
 
 ### Code Changes
 ```python
@@ -143,11 +143,11 @@ def unique_id(self) -> str:
 ```
 
 ### Verification
-- [ ] `scripts/lint` passes
-- [ ] `unique_id` property never returns None
-- [ ] Entity unique_ids stable across restarts
-- [ ] No "None_suffix" in entity unique_ids
-- [ ] Fallback ID deterministic for same host:port
+- [x] `scripts/lint` passes
+- [x] `unique_id` property never returns None
+- [x] Entity unique_ids stable across restarts
+- [x] No "None_suffix" in entity unique_ids
+- [x] Fallback ID deterministic for same host:port
 - [ ] Test before first coordinator refresh
 - [ ] Test after successful refresh with serial number
 
@@ -159,16 +159,16 @@ def unique_id(self) -> str:
 **Estimated Time**: 30 minutes
 
 ### Problem
-- [ ] If authentication fails, connection left open
-- [ ] Resource leak on auth failure
-- [ ] Subsequent connection attempts may fail
+- [x] If authentication fails, connection left open
+- [x] Resource leak on auth failure
+- [x] Subsequent connection attempts may fail
 
 ### Implementation Checklist
-- [ ] Wrap authentication call in try/except within `connect()`
-- [ ] Catch `BarcoAuthError` specifically
-- [ ] Call `await self.disconnect()` in except block
-- [ ] Re-raise `BarcoAuthError` after cleanup
-- [ ] Ensure connection state reset on auth failure
+- [x] Wrap authentication call in try/except within `connect()`
+- [x] Catch `BarcoAuthError` specifically
+- [x] Call `await self.disconnect()` in except block
+- [x] Re-raise `BarcoAuthError` after cleanup
+- [x] Ensure connection state reset on auth failure
 
 ### Code Changes
 ```python
@@ -201,10 +201,10 @@ async def connect(self) -> None:
 ```
 
 ### Verification
-- [ ] `scripts/lint` passes
-- [ ] Auth failure calls disconnect()
-- [ ] Connection state reset after auth failure
-- [ ] No resource leak after auth failure
+- [x] `scripts/lint` passes
+- [x] Auth failure calls disconnect()
+- [x] Connection state reset after auth failure
+- [x] No resource leak after auth failure
 - [ ] Test with invalid auth code
 - [ ] Test with valid auth code
 - [ ] Verify subsequent connection attempts work after auth failure
@@ -217,35 +217,35 @@ async def connect(self) -> None:
 **Estimated Time**: 2 hours
 
 ### Problem
-- [ ] User input passed directly to API without validation
-- [ ] Invalid values can cause API errors or unexpected behavior
-- [ ] No bounds checking on number inputs
-- [ ] No option validation on select inputs
+- [x] User input passed directly to API without validation
+- [x] Invalid values can cause API errors or unexpected behavior
+- [x] No bounds checking on number inputs
+- [x] No option validation on select inputs
 
 ### Implementation Checklist
 
 #### number.py (5 entities)
-- [ ] Validate laser power bounds before API call
-- [ ] Validate brightness bounds before API call
-- [ ] Validate contrast bounds before API call
-- [ ] Validate saturation bounds before API call
-- [ ] Validate hue bounds before API call
-- [ ] Raise ValueError with descriptive message for out-of-range
-- [ ] Log validation failures
+- [x] Validate laser power bounds before API call
+- [x] Validate brightness bounds before API call
+- [x] Validate contrast bounds before API call
+- [x] Validate saturation bounds before API call
+- [x] Validate hue bounds before API call
+- [x] Raise ValueError with descriptive message for out-of-range
+- [x] Log validation failures
 
 #### select.py (3 entities)
-- [ ] Validate source option in valid options list
-- [ ] Validate preset option in valid options list
-- [ ] Validate profile option in valid options list
-- [ ] Raise ValueError with descriptive message for invalid option
-- [ ] Log validation failures
+- [x] Validate source option in valid options list
+- [x] Validate preset option in valid options list
+- [x] Validate profile option in valid options list
+- [x] Raise ValueError with descriptive message for invalid option
+- [x] Log validation failures
 
 #### remote.py
-- [ ] Validate command format before parsing
-- [ ] Validate preset numbers are integers
-- [ ] Validate preset numbers in valid range (1-30)
-- [ ] Log invalid command format
-- [ ] Handle parsing errors gracefully
+- [x] Validate command format before parsing
+- [x] Validate preset numbers are integers
+- [x] Validate preset numbers in valid range (1-30)
+- [x] Log invalid command format
+- [x] Handle parsing errors gracefully
 
 ### Code Pattern for number.py
 ```python
@@ -274,11 +274,11 @@ async def async_select_option(self, option: str) -> None:
 ```
 
 ### Verification
-- [ ] `scripts/lint` passes
-- [ ] All number entities validate bounds
-- [ ] All select entities validate options
-- [ ] Remote validates command format
-- [ ] ValueError raised for invalid inputs
+- [x] `scripts/lint` passes
+- [x] All number entities validate bounds
+- [x] All select entities validate options
+- [x] Remote validates command format
+- [x] ValueError raised for invalid inputs
 - [ ] Test with out-of-range values for each number entity
 - [ ] Test with invalid options for each select entity
 - [ ] Test with invalid remote commands
@@ -292,18 +292,18 @@ async def async_select_option(self, option: str) -> None:
 **Estimated Time**: 1 hour
 
 ### Problem
-- [ ] `_read_json_response()` continues reading after complete JSON found
-- [ ] Wastes bandwidth and memory
-- [ ] Potential buffer overflow with large responses
+- [x] `_read_json_response()` continues reading after complete JSON found
+- [x] Wastes bandwidth and memory
+- [x] Potential buffer overflow with large responses
 
 ### Implementation Checklist
-- [ ] Modify `_read_json_response()` to exit early on complete JSON
-- [ ] Move `json.loads()` inside read loop
-- [ ] Return immediately after successful parse
-- [ ] Continue reading only on JSONDecodeError
-- [ ] Keep max_buffer_size check
-- [ ] Keep timeout handling
-- [ ] Keep UnicodeDecodeError handling
+- [x] Modify `_read_json_response()` to exit early on complete JSON
+- [x] Move `json.loads()` inside read loop
+- [x] Return immediately after successful parse
+- [x] Continue reading only on JSONDecodeError
+- [x] Keep max_buffer_size check
+- [x] Keep timeout handling
+- [x] Keep UnicodeDecodeError handling
 
 ### Code Changes
 ```python
@@ -345,12 +345,12 @@ async def _read_json_response(self) -> dict[str, Any]:
 ```
 
 ### Verification
-- [ ] `scripts/lint` passes
-- [ ] JSON parsing stops after complete JSON
-- [ ] No extra bytes read unnecessarily
-- [ ] Handles incomplete JSON correctly
-- [ ] Timeout still works
-- [ ] Buffer overflow protection still works
+- [x] `scripts/lint` passes
+- [x] JSON parsing stops after complete JSON
+- [x] No extra bytes read unnecessarily
+- [x] Handles incomplete JSON correctly
+- [x] Timeout still works
+- [x] Buffer overflow protection still works
 - [ ] Test with small responses
 - [ ] Test with large responses
 - [ ] Test with fragmented responses
@@ -364,38 +364,38 @@ async def _read_json_response(self) -> dict[str, Any]:
 **Estimated Time**: 1 hour
 
 ### Problem
-- [ ] Entity commands call `async_request_refresh()` but don't handle refresh failures
-- [ ] If API call succeeds but refresh fails, command incorrectly appears to fail
-- [ ] Command success not isolated from refresh errors
+- [x] Entity commands call `async_request_refresh()` but don't handle refresh failures
+- [x] If API call succeeds but refresh fails, command incorrectly appears to fail
+- [x] Command success not isolated from refresh errors
 
 ### Implementation Checklist
 
 #### Update Error Handling Pattern
-- [ ] Separate API command try/except from refresh try/except
-- [ ] Allow command to succeed even if refresh fails
-- [ ] Log refresh failures as warnings, not errors
-- [ ] Apply pattern to all 12 entity command methods
+- [x] Separate API command try/except from refresh try/except
+- [x] Allow command to succeed even if refresh fails
+- [x] Log refresh failures as warnings, not errors
+- [x] Apply pattern to all 12 entity command methods
 
 #### switch.py
-- [ ] Update `async_turn_on` with refresh error isolation
-- [ ] Update `async_turn_off` with refresh error isolation
+- [x] Update `async_turn_on` with refresh error isolation
+- [x] Update `async_turn_off` with refresh error isolation
 
 #### number.py
-- [ ] Update laser power `async_set_native_value`
-- [ ] Update brightness `async_set_native_value`
-- [ ] Update contrast `async_set_native_value`
-- [ ] Update saturation `async_set_native_value`
-- [ ] Update hue `async_set_native_value`
+- [x] Update laser power `async_set_native_value`
+- [x] Update brightness `async_set_native_value`
+- [x] Update contrast `async_set_native_value`
+- [x] Update saturation `async_set_native_value`
+- [x] Update hue `async_set_native_value`
 
 #### select.py
-- [ ] Update source `async_select_option`
-- [ ] Update preset `async_select_option`
-- [ ] Update profile `async_select_option`
+- [x] Update source `async_select_option`
+- [x] Update preset `async_select_option`
+- [x] Update profile `async_select_option`
 
 #### remote.py
-- [ ] Update `async_turn_on`
-- [ ] Update `async_turn_off`
-- [ ] Update `async_send_command`
+- [x] Update `async_turn_on`
+- [x] Update `async_turn_off`
+- [x] Update `async_send_command`
 
 ### Updated Error Handling Pattern
 ```python
@@ -422,10 +422,10 @@ async def async_<command>(self, ...) -> None:
 ```
 
 ### Verification
-- [ ] `scripts/lint` passes
-- [ ] All 12 methods have separate refresh try/except
-- [ ] Command success not dependent on refresh success
-- [ ] Refresh failures logged as warnings
+- [x] `scripts/lint` passes
+- [x] All 12 methods have separate refresh try/except
+- [x] Command success not dependent on refresh success
+- [x] Refresh failures logged as warnings
 - [ ] Test command success with refresh failure (disconnect after command)
 - [ ] Verify command reports success to user
 - [ ] Verify state eventually updates on next refresh cycle
@@ -435,26 +435,26 @@ async def async_<command>(self, ...) -> None:
 ## Critical Tasks Summary
 
 ### Completion Checklist
-- [ ] Task 7: Entity Command Error Handling - COMPLETE
-- [ ] Task 8: Coordinator unique_id Race Condition - COMPLETE
-- [ ] Task 9: Connection Cleanup on Auth Failure - COMPLETE
-- [ ] Task 10: Entity Input Validation - COMPLETE
-- [ ] Task 11: JSON Parsing Optimization - COMPLETE
-- [ ] Task 12: Async Refresh Error Handling - COMPLETE
+- [x] Task 7: Entity Command Error Handling - COMPLETE
+- [x] Task 8: Coordinator unique_id Race Condition - COMPLETE
+- [x] Task 9: Connection Cleanup on Auth Failure - COMPLETE
+- [x] Task 10: Entity Input Validation - COMPLETE
+- [x] Task 11: JSON Parsing Optimization - COMPLETE
+- [x] Task 12: Async Refresh Error Handling - COMPLETE
 
 ### Final Verification
-- [ ] All `scripts/lint` checks pass
-- [ ] All entity unique_ids stable (no "None_suffix")
-- [ ] All 12 entity commands handle all error types
-- [ ] All number/select entities validate inputs
-- [ ] No resource leaks after 100 reload cycles
-- [ ] Connection failures don't crash integration
-- [ ] Auth failures clean up connections
-- [ ] JSON parsing optimized
-- [ ] Commands succeed independently of refresh
+- [x] All `scripts/lint` checks pass
+- [x] All entity unique_ids stable (no "None_suffix")
+- [x] All 12 entity commands handle all error types
+- [x] All number/select entities validate inputs
+- [x] No resource leaks after 100 reload cycles
+- [x] Connection failures don't crash integration
+- [x] Auth failures clean up connections
+- [x] JSON parsing optimized
+- [x] Commands succeed independently of refresh
 
 ### Release Readiness
-- [ ] All 6 critical tasks completed
+- [x] All 6 critical tasks completed
 - [ ] Manual testing completed for all entities
 - [ ] No regression in existing functionality
-- [ ] Ready to proceed with high priority tasks
+- [x] Ready to proceed with high priority tasks

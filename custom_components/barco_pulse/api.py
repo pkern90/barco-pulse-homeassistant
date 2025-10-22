@@ -56,7 +56,7 @@ class BarcoDevice:
         self._max_request_id = 2**31 - 1  # Prevent overflow
 
     async def connect(self) -> None:
-        """Establish TCP connection to the projector."""
+        """Establish TCP connection with auth cleanup."""
         try:
             _LOGGER.debug("Connecting to %s:%s", self.host, self.port)
             self._reader, self._writer = await asyncio.wait_for(
@@ -68,7 +68,12 @@ class BarcoDevice:
 
             # Authenticate if auth code provided
             if self.auth_code:
-                await self.authenticate(self.auth_code)
+                try:
+                    await self.authenticate(self.auth_code)
+                except BarcoAuthError:
+                    # Auth failed - clean up connection
+                    await self.disconnect()
+                    raise
 
         except TimeoutError as err:
             msg = f"Connection timeout to {self.host}:{self.port}"

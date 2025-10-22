@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.remote import RemoteEntity
 
-from .const import POWER_STATES_ACTIVE
+from .const import POWER_STATES_ACTIVE, PRESET_MAX_NUMBER
 from .entity import BarcoEntity
+from .helpers import handle_api_errors, safe_refresh
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -18,6 +20,8 @@ if TYPE_CHECKING:
 
     from .coordinator import BarcoDataUpdateCoordinator
     from .data import BarcoRuntimeData
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class BarcoRemote(BarcoEntity, RemoteEntity):
@@ -36,18 +40,71 @@ class BarcoRemote(BarcoEntity, RemoteEntity):
         return self.coordinator.data.get("state") in POWER_STATES_ACTIVE
 
     async def async_turn_on(self, **_kwargs: Any) -> None:
-        """Turn the projector on."""
+        """Turn the projector on with error handling."""
+        await self._turn_on_with_refresh()
+
+    @handle_api_errors
+    async def _turn_on_with_refresh(self) -> None:
+        """Execute power on command."""
         await self.coordinator.device.power_on()
-        await self.coordinator.async_request_refresh()
+        await safe_refresh(self.coordinator, "power on")
 
     async def async_turn_off(self, **_kwargs: Any) -> None:
-        """Turn the projector off."""
+        """Turn the projector off with error handling."""
+        await self._turn_off_with_refresh()
+
+    @handle_api_errors
+    async def _turn_off_with_refresh(self) -> None:
+        """Execute power off command."""
         await self.coordinator.device.power_off()
-        await self.coordinator.async_request_refresh()
+        await safe_refresh(self.coordinator, "power off")
+
+    @handle_api_errors
+    async def _execute_command(self, cmd: str) -> None:
+        """Execute a single command with validation and error handling."""
+        if cmd.startswith("source_"):
+            # Extract source name (e.g., "source_HDMI 1" -> "HDMI 1")
+            source_name = cmd[7:]
+            if not source_name:
+                _LOGGER.warning("Empty source name in command: %s", cmd)
+                return
+            await self.coordinator.device.set_source(source_name)
+
+        elif cmd.startswith("preset_"):
+            # Extract preset number (e.g., "preset_5" -> 5)
+            try:
+                preset_str = cmd[7:]
+                preset_num = int(preset_str)
+
+                # Validate preset number range
+                if preset_num < 0 or preset_num > PRESET_MAX_NUMBER:
+                    _LOGGER.warning(
+                        "Preset number %d out of range [0, %d]",
+                        preset_num,
+                        PRESET_MAX_NUMBER,
+                    )
+                    return
+
+                await self.coordinator.device.activate_preset(preset_num)
+
+            except (ValueError, IndexError):
+                _LOGGER.warning("Invalid preset number in command: %s", cmd)
+                return
+
+        elif cmd.startswith("profile_"):
+            # Extract profile name (e.g., "profile_Cinema" -> "Cinema")
+            profile_name = cmd[8:]
+            if not profile_name:
+                _LOGGER.warning("Empty profile name in command: %s", cmd)
+                return
+            await self.coordinator.device.activate_profile(profile_name)
+
+        else:
+            _LOGGER.warning("Unknown command format: %s", cmd)
 
     async def async_send_command(self, command: Iterable[str], **_kwargs: Any) -> None:
         """
-        Send a command to the projector.
+        Send a command to the projector with validation and error handling.
 
         Supported command formats:
         - source_<name>: Switch to input source (e.g., "source_HDMI 1")
@@ -55,24 +112,13 @@ class BarcoRemote(BarcoEntity, RemoteEntity):
         - profile_<name>: Activate profile by name (e.g., "profile_Cinema")
         """
         for cmd in command:
-            if cmd.startswith("source_"):
-                # Extract source name from command (e.g., "source_HDMI 1" -> "HDMI 1")
-                source_name = cmd[7:]  # Remove "source_" prefix
-                await self.coordinator.device.set_source(source_name)
-            elif cmd.startswith("preset_"):
-                # Extract preset number (e.g., "preset_5" -> 5)
-                try:
-                    preset_num = int(cmd[7:])  # Remove "preset_" prefix
-                    await self.coordinator.device.activate_preset(preset_num)
-                except (ValueError, IndexError):
-                    # Log but don't fail if preset number is invalid
-                    pass
-            elif cmd.startswith("profile_"):
-                # Extract profile name (e.g., "profile_Cinema" -> "Cinema")
-                profile_name = cmd[8:]  # Remove "profile_" prefix
-                await self.coordinator.device.activate_profile(profile_name)
+            if not isinstance(cmd, str):
+                _LOGGER.warning("Invalid command type: %s (expected str)", type(cmd))
+                continue
 
-        await self.coordinator.async_request_refresh()
+            await self._execute_command(cmd)
+
+        await safe_refresh(self.coordinator, "send command")
 
 
 async def async_setup_entry(

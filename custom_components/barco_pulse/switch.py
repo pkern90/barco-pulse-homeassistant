@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.switch import SwitchDeviceClass, SwitchEntity
 
 from .const import POWER_STATES_ACTIVE
 from .entity import BarcoEntity
+from .helpers import handle_api_errors, safe_refresh
 
 if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
@@ -16,6 +18,8 @@ if TYPE_CHECKING:
 
     from .coordinator import BarcoDataUpdateCoordinator
     from .data import BarcoRuntimeData
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class BarcoPowerSwitch(BarcoEntity, SwitchEntity):
@@ -36,13 +40,23 @@ class BarcoPowerSwitch(BarcoEntity, SwitchEntity):
 
     async def async_turn_on(self, **_kwargs: Any) -> None:
         """Turn the projector on."""
+        await self._turn_on_with_refresh()
+
+    @handle_api_errors
+    async def _turn_on_with_refresh(self) -> None:
+        """Execute power on command."""
         await self.coordinator.device.power_on()
-        await self.coordinator.async_request_refresh()
+        await safe_refresh(self.coordinator, "power on")
 
     async def async_turn_off(self, **_kwargs: Any) -> None:
         """Turn the projector off."""
+        await self._turn_off_with_refresh()
+
+    @handle_api_errors
+    async def _turn_off_with_refresh(self) -> None:
+        """Execute power off command."""
         await self.coordinator.device.power_off()
-        await self.coordinator.async_request_refresh()
+        await safe_refresh(self.coordinator, "power off")
 
 
 async def async_setup_entry(
