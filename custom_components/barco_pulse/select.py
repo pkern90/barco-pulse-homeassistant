@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 
 from homeassistant.components.select import SelectEntity
 
-from .const import PRESET_MAX_NUMBER
+from .const import PRESET_MAX_NUMBER, PowerState
 from .entity import BarcoEntity
 from .helpers import handle_api_errors, safe_refresh
 
@@ -100,7 +100,7 @@ class BarcoPresetSelect(BarcoEntity, SelectEntity):
         """Return if entity is available."""
         # Only available when projector is powered on
         state = self.coordinator.data.get("state")
-        return state in ("on", "ready")
+        return state in (PowerState.ON, PowerState.READY)
 
     async def async_select_option(self, option: str) -> None:
         """Select and activate a preset with validation and error handling."""
@@ -169,7 +169,7 @@ class BarcoProfileSelect(BarcoEntity, SelectEntity):
         """Return if entity is available."""
         # Only available when projector is powered on
         state = self.coordinator.data.get("state")
-        return state in ("on", "ready")
+        return state in (PowerState.ON, PowerState.READY)
 
     async def async_select_option(self, option: str) -> None:
         """Select and activate a profile with validation and error handling."""

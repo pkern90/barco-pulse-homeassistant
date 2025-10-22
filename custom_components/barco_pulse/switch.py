@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.switch import SwitchDeviceClass, SwitchEntity
 
-from .const import POWER_STATES_ACTIVE
+from .const import ACTIVE_STATES
 from .entity import BarcoEntity
 from .helpers import handle_api_errors, safe_refresh
 
@@ -36,7 +36,7 @@ class BarcoPowerSwitch(BarcoEntity, SwitchEntity):
     @property
     def is_on(self) -> bool:
         """Return True if the projector is on."""
-        return self.coordinator.data.get("state") in POWER_STATES_ACTIVE
+        return self.coordinator.data.get("state") in ACTIVE_STATES
 
     async def async_turn_on(self, **_kwargs: Any) -> None:
         """Turn the projector on."""

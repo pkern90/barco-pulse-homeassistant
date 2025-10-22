@@ -15,11 +15,12 @@ from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import (
-    INTERVAL_FAST,
-    INTERVAL_SLOW,
+    DEFAULT_POLLING_INTERVAL,
     NAME,
+    POLLING_INTERVALS,
     POWER_STATES_ACTIVE,
     PRESET_ASSIGNMENT_TUPLE_SIZE,
+    PowerState,
 )
 from .exceptions import (
     BarcoAuthError,
@@ -47,7 +48,7 @@ class BarcoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             hass=hass,
             logger=_LOGGER,
             name=NAME,
-            update_interval=INTERVAL_SLOW,
+            update_interval=DEFAULT_POLLING_INTERVAL,
         )
         self.device = device
         self._connection_lock = asyncio.Lock()
@@ -143,6 +144,23 @@ class BarcoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         except BarcoStateError:
             _LOGGER.debug("Available sources not available in current state")
 
+        # Get laser power constraints
+        try:
+            laser_min, laser_max = await self.device.get_laser_limits()
+            data["laser_min"] = laser_min
+            data["laser_max"] = laser_max
+            _LOGGER.debug("Laser constraints: min=%s, max=%s", laser_min, laser_max)
+        except BarcoStateError:
+            # Projector not in active state, use defaults
+            data["laser_min"] = 0.0
+            data["laser_max"] = 100.0
+            _LOGGER.debug("Using default laser constraints")
+        except (ValueError, TypeError) as err:
+            # Invalid constraint values, use defaults
+            _LOGGER.warning("Invalid laser constraints: %s", err)
+            data["laser_min"] = 0.0
+            data["laser_max"] = 100.0
+
         return data
 
     def _parse_preset_assignments(self, preset_data: Any) -> dict[str, Any]:
@@ -181,11 +199,24 @@ class BarcoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 if state in POWER_STATES_ACTIVE:
                     active_data = await self._get_active_properties()
                     data.update(active_data)
-                    # Use fast polling when active
-                    self.update_interval = INTERVAL_FAST
-                else:
-                    # Use slow polling when not active
-                    self.update_interval = INTERVAL_SLOW
+
+                # Update polling interval based on current state
+                try:
+                    power_state = PowerState(state)
+                    new_interval = POLLING_INTERVALS.get(
+                        power_state, DEFAULT_POLLING_INTERVAL
+                    )
+                except ValueError:
+                    # Invalid state string, use default
+                    new_interval = DEFAULT_POLLING_INTERVAL
+
+                if self.update_interval != new_interval:
+                    self.update_interval = new_interval
+                    _LOGGER.debug(
+                        "Updated polling interval to %s for state %s",
+                        new_interval,
+                        state,
+                    )
 
                 _LOGGER.debug("Updated data: %s", data)
                 return data
