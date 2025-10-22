@@ -25,6 +25,9 @@ POWER_STATES_ACTIVE = ["on", "ready"]
 POWER_STATES_TRANSITIONAL = ["conditioning", "deconditioning"]
 POWER_STATES_STANDBY = ["standby", "eco", "boot"]
 
+# API constants
+PRESET_ASSIGNMENT_TUPLE_SIZE = 2  # [preset_num, profile_name]
+
 # Entity attribute keys
 ATTR_LASER_POWER = "laser_power"
 ATTR_SOURCE = "source"

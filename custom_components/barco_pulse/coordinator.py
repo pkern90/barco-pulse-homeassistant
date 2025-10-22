@@ -17,6 +17,7 @@ from .const import (
     INTERVAL_SLOW,
     NAME,
     POWER_STATES_ACTIVE,
+    PRESET_ASSIGNMENT_TUPLE_SIZE,
 )
 from .exceptions import (
     BarcoAuthError,
@@ -76,72 +77,76 @@ class BarcoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         """Get properties only available when projector is active (on/ready)."""
         data: dict[str, Any] = {}
 
-        # Laser power
-        try:
-            data["laser_power"] = await self.device.get_laser_power()
-        except BarcoStateError:
-            _LOGGER.debug("Laser power not available in current state")
+        # Build list of properties to fetch in batch
+        property_names = [
+            "illumination.sources.laser.power",
+            "image.window.main.source",
+            "image.brightness",
+            "image.contrast",
+            "image.saturation",
+            "profile.presetassignments",
+            "profile.profiles",
+        ]
 
-        # Laser limits
         try:
-            min_power, max_power = await self.device.get_laser_limits()
-            data["laser_power_min"] = min_power
-            data["laser_power_max"] = max_power
-        except BarcoStateError:
-            _LOGGER.debug("Laser limits not available in current state")
+            # Fetch properties in a single batch request
+            results = await self.device.get_properties(property_names)
 
-        # Current source
-        try:
-            data["source"] = await self.device.get_source()
-        except BarcoStateError:
-            _LOGGER.debug("Source not available in current state")
+            # Parse laser power
+            if "illumination.sources.laser.power" in results:
+                data["laser_power"] = float(results["illumination.sources.laser.power"])
 
-        # Available sources
+            # Parse source
+            if "image.window.main.source" in results:
+                data["source"] = results["image.window.main.source"]
+
+            # Parse picture settings
+            if "image.brightness" in results:
+                data["brightness"] = float(results["image.brightness"])
+            if "image.contrast" in results:
+                data["contrast"] = float(results["image.contrast"])
+            if "image.saturation" in results:
+                data["saturation"] = float(results["image.saturation"])
+
+            # Parse preset assignments (returned as array of arrays)
+            if "profile.presetassignments" in results:
+                data.update(
+                    self._parse_preset_assignments(results["profile.presetassignments"])
+                )
+
+            # Parse profiles
+            if "profile.profiles" in results:
+                profiles = results["profile.profiles"]
+                if isinstance(profiles, list):
+                    data["profiles"] = profiles
+
+        except BarcoStateError:
+            _LOGGER.debug("Some properties not available in current state")
+
+        # Get available sources separately (uses different method)
         try:
             data["available_sources"] = await self.device.get_available_sources()
         except BarcoStateError:
             _LOGGER.debug("Available sources not available in current state")
 
-        # Brightness
-        try:
-            data["brightness"] = await self.device.get_brightness()
-        except BarcoStateError:
-            _LOGGER.debug("Brightness not available in current state")
-
-        # Contrast
-        try:
-            data["contrast"] = await self.device.get_contrast()
-        except BarcoStateError:
-            _LOGGER.debug("Contrast not available in current state")
-
-        # Saturation
-        try:
-            data["saturation"] = await self.device.get_saturation()
-        except BarcoStateError:
-            _LOGGER.debug("Saturation not available in current state")
-
-        # Hue
-        try:
-            data["hue"] = await self.device.get_hue()
-        except BarcoStateError:
-            _LOGGER.debug("Hue not available in current state")
-
-        # Preset assignments and profiles
-        try:
-            preset_assignments = await self.device.get_preset_assignments()
-            data["preset_assignments"] = preset_assignments
-            # Create list of available presets (only those with assigned profiles)
-            data["available_presets"] = sorted(preset_assignments.keys())
-        except BarcoStateError:
-            _LOGGER.debug("Preset assignments not available in current state")
-
-        try:
-            profiles = await self.device.get_profiles()
-            data["profiles"] = profiles
-        except BarcoStateError:
-            _LOGGER.debug("Profiles not available in current state")
-
         return data
+
+    def _parse_preset_assignments(self, preset_data: Any) -> dict[str, Any]:
+        """Parse preset assignments from API response."""
+        result: dict[str, Any] = {}
+        if not isinstance(preset_data, list):
+            return result
+
+        assignments = {}
+        for item in preset_data:
+            if isinstance(item, list) and len(item) >= PRESET_ASSIGNMENT_TUPLE_SIZE:
+                preset_num, profile_name = item[0], item[1]
+                if profile_name:  # Only include assigned presets
+                    assignments[int(preset_num)] = profile_name
+
+        result["preset_assignments"] = assignments
+        result["available_presets"] = sorted(assignments.keys())
+        return result
 
     async def _async_update_data(self) -> dict[str, Any]:
         """Fetch data from the projector."""

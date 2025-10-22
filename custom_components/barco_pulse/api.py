@@ -9,6 +9,7 @@ import json
 import logging
 from typing import Any
 
+from .const import PRESET_ASSIGNMENT_TUPLE_SIZE
 from .exceptions import (
     BarcoApiError,
     BarcoAuthError,
@@ -52,6 +53,7 @@ class BarcoDevice:
         self._writer: asyncio.StreamWriter | None = None
         self._connected = False
         self._request_id = 0
+        self._max_request_id = 2**31 - 1  # Prevent overflow
 
     async def connect(self) -> None:
         """Establish TCP connection to the projector."""
@@ -162,6 +164,8 @@ class BarcoDevice:
         try:
             # Read until we get valid JSON
             buffer = b""
+            max_buffer_size = 1024 * 1024  # 1MB limit to prevent memory leaks
+
             while True:
                 chunk = await asyncio.wait_for(
                     self._reader.read(4096),
@@ -172,6 +176,12 @@ class BarcoDevice:
                     raise BarcoConnectionError("Connection closed by projector")
 
                 buffer += chunk
+
+                # Prevent unbounded buffer growth
+                if len(buffer) > max_buffer_size:
+                    raise BarcoApiError(
+                        -1, f"Response too large (>{max_buffer_size} bytes)"
+                    )
 
                 # Try to parse as JSON
                 try:
@@ -255,8 +265,10 @@ class BarcoDevice:
             if not self._connected:
                 await self.connect()
 
-            # Generate request ID
+            # Generate request ID (reset on overflow to prevent issues)
             self._request_id += 1
+            if self._request_id > self._max_request_id:
+                self._request_id = 1
             request_id = self._request_id
 
             # Build JSON-RPC request
@@ -568,10 +580,21 @@ class BarcoDevice:
 
         """
         result = await self.get_property("profile.presetassignments")
-        if not isinstance(result, dict):
+
+        # API returns array of [preset_num, profile_name] pairs
+        if not isinstance(result, list):
             return {}
-        # Convert string keys to integers
-        return {int(k): v for k, v in result.items()}
+
+        # Convert to dict, filtering out empty profile names
+        assignments = {}
+        for item in result:
+            if isinstance(item, list) and len(item) >= PRESET_ASSIGNMENT_TUPLE_SIZE:
+                preset_num, profile_name = item[0], item[1]
+                # Only include presets with assigned profiles
+                if profile_name:
+                    assignments[int(preset_num)] = profile_name
+
+        return assignments
 
     async def get_profiles(self) -> list[str]:
         """
