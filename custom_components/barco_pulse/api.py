@@ -96,6 +96,22 @@ class BarcoDevice:
                 self._connected = False
                 _LOGGER.debug("Disconnected from %s:%s", self.host, self.port)
 
+    async def _ensure_connected(self) -> None:
+        """Ensure connection is active, reconnect if needed."""
+        stale = (
+            self._connected
+            and self._reader
+            and self._writer
+            and self._writer.is_closing()
+        )
+        if stale:
+            _LOGGER.warning("Connection closed, reconnecting...")
+            self._connected = False
+            self._reader = None
+            self._writer = None
+        if not self._connected:
+            await self.connect()
+
     def _build_jsonrpc_request(
         self,
         method: str,
@@ -266,9 +282,8 @@ class BarcoDevice:
 
         """
         async with self._lock:
-            # Auto-connect if not connected
-            if not self._connected:
-                await self.connect()
+            # Ensure connection is active
+            await self._ensure_connected()
 
             # Generate request ID (reset on overflow to prevent issues)
             self._request_id += 1
@@ -285,7 +300,7 @@ class BarcoDevice:
 
             _LOGGER.debug("Sending request: %s", json_payload)
 
-            # Send request
+            # Send request with connection error handling
             try:
                 if not self._writer:
                     raise BarcoConnectionError("Not connected")
@@ -294,7 +309,16 @@ class BarcoDevice:
                 await self._writer.drain()
 
             except (ConnectionError, OSError) as err:
+                writer = self._writer
                 self._connected = False
+                self._reader = None
+                self._writer = None
+                if writer:
+                    try:
+                        writer.close()
+                        await writer.wait_closed()
+                    except (ConnectionError, OSError):
+                        pass
                 raise BarcoConnectionError(f"Failed to send request: {err}") from err
 
             # Read response

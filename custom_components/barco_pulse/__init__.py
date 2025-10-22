@@ -84,7 +84,10 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     # Disconnect device if unload successful
     if unload_ok:
-        await entry.runtime_data.client.disconnect()
+        try:
+            await entry.runtime_data.client.disconnect()
+        except (BarcoConnectionError, OSError) as err:
+            _LOGGER.debug("Error disconnecting during unload: %s", err)
 
     return unload_ok
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import logging
 from typing import Any
 
@@ -63,7 +64,6 @@ class BarcoConfigFlow(ConfigFlow, domain=DOMAIN):
                 await device.connect()
                 serial_number = await device.get_serial_number()
                 model_name = await device.get_model_name()
-                await device.disconnect()
 
                 # Set unique ID based on serial number
                 await self.async_set_unique_id(serial_number)
@@ -80,6 +80,9 @@ class BarcoConfigFlow(ConfigFlow, domain=DOMAIN):
             except Exception:
                 _LOGGER.exception("Unexpected exception")
                 errors["base"] = "unknown"
+            finally:
+                with contextlib.suppress(BarcoConnectionError, OSError):
+                    await device.disconnect()
 
         return self.async_show_form(
             step_id="user",
@@ -115,7 +118,6 @@ class BarcoConfigFlow(ConfigFlow, domain=DOMAIN):
                 # Validate connection
                 await device.connect()
                 await device.get_state()
-                await device.disconnect()
 
                 # Update entry
                 self.hass.config_entries.async_update_entry(entry, data=user_input)
@@ -132,6 +134,9 @@ class BarcoConfigFlow(ConfigFlow, domain=DOMAIN):
             except Exception:
                 _LOGGER.exception("Unexpected exception during reconfigure")
                 errors["base"] = "unknown"
+            finally:
+                with contextlib.suppress(BarcoConnectionError, OSError):
+                    await device.disconnect()
 
         # Use existing entry data as defaults if no user input yet
         defaults = entry.data if user_input is None else user_input

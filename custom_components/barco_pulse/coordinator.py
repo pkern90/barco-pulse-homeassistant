@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import hashlib
 import logging
 import time
@@ -97,21 +98,29 @@ class BarcoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             # Fetch properties in a single batch request
             results = await self.device.get_properties(property_names)
 
-            # Parse laser power
-            if "illumination.sources.laser.power" in results:
-                data["laser_power"] = float(results["illumination.sources.laser.power"])
+            # Validate response type
+            if not isinstance(results, dict):
+                _LOGGER.warning("Invalid properties response type: %s", type(results))
+                return data
+
+            # Parse float values with safe conversion
+            for key, result_key in [
+                ("laser_power", "illumination.sources.laser.power"),
+                ("brightness", "image.brightness"),
+                ("contrast", "image.contrast"),
+                ("saturation", "image.saturation"),
+            ]:
+                if result_key in results:
+                    value = results[result_key]
+                    try:
+                        data[key] = float(value) if value is not None else None
+                    except (ValueError, TypeError) as err:
+                        _LOGGER.warning("Invalid %s value: %s (%s)", key, value, err)
+                        data[key] = None
 
             # Parse source
             if "image.window.main.source" in results:
                 data["source"] = results["image.window.main.source"]
-
-            # Parse picture settings
-            if "image.brightness" in results:
-                data["brightness"] = float(results["image.brightness"])
-            if "image.contrast" in results:
-                data["contrast"] = float(results["image.contrast"])
-            if "image.saturation" in results:
-                data["saturation"] = float(results["image.saturation"])
 
             # Parse preset assignments (returned as array of arrays)
             if "profile.presetassignments" in results:
@@ -184,8 +193,12 @@ class BarcoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             except BarcoAuthError as err:
                 raise ConfigEntryAuthFailed(f"Authentication failed: {err}") from err
             except BarcoConnectionError as err:
+                with contextlib.suppress(BarcoConnectionError, OSError):
+                    await self.device.disconnect()
                 raise UpdateFailed(f"Connection error: {err}") from err
             except Exception as err:
+                with contextlib.suppress(BarcoConnectionError, OSError):
+                    await self.device.disconnect()
                 raise UpdateFailed(f"Unexpected error: {err}") from err
 
     @property
