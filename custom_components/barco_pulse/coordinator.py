@@ -234,7 +234,22 @@ class BarcoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     @property
     def unique_id(self) -> str:
-        """Return unique ID for this coordinator, never None."""
+        """
+        Return unique ID for this coordinator.
+
+        Prefers serial number from device, falls back to deterministic hash
+        of host:port if serial number is unavailable.
+
+        Returns:
+            Stable unique identifier that never changes for the same device.
+
+        """
         if self.data and self.data.get("serial_number"):
             return self.data["serial_number"]
+
+        _LOGGER.debug(
+            "Using fallback unique_id for %s:%s",
+            self.device.host,
+            self.device.port,
+        )
         return self._fallback_id

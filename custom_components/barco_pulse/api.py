@@ -7,6 +7,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import time
 from typing import Any
 
 from .const import PRESET_ASSIGNMENT_TUPLE_SIZE
@@ -54,6 +55,8 @@ class BarcoDevice:
         self._connected = False
         self._request_id = 0
         self._max_request_id = 2**31 - 1  # Prevent overflow
+        self._last_request_time = 0.0  # For rate limiting
+        self._min_request_interval = 0.1  # 100ms minimum between requests
 
     async def connect(self) -> None:
         """Establish TCP connection with auth cleanup."""
@@ -282,6 +285,15 @@ class BarcoDevice:
 
         """
         async with self._lock:
+            # Enforce minimum interval between all requests
+            elapsed = time.time() - self._last_request_time
+            if elapsed < self._min_request_interval:
+                wait_time = self._min_request_interval - elapsed
+                _LOGGER.debug("Rate limiting: waiting %.3fs before request", wait_time)
+                await asyncio.sleep(wait_time)
+
+            self._last_request_time = time.time()
+
             # Ensure connection is active
             await self._ensure_connected()
 
