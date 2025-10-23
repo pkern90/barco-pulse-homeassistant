@@ -189,11 +189,15 @@ class BarcoDevice:
             # Read until we get valid JSON
             buffer = b""
             max_buffer_size = 1024 * 1024  # 1MB limit to prevent memory leaks
+            read_timeout = self.timeout  # Use configured timeout
+            chunk_count = 0
+            max_chunks = 256  # Limit iterations to prevent infinite loops
 
-            while True:
+            while chunk_count < max_chunks:
+                chunk_count += 1
                 chunk = await asyncio.wait_for(
                     self._reader.read(4096),
-                    timeout=self.timeout,
+                    timeout=read_timeout,
                 )
 
                 if not chunk:
@@ -209,10 +213,28 @@ class BarcoDevice:
 
                 # Try to parse as JSON
                 try:
-                    return json.loads(buffer.decode("utf-8"))
+                    response = json.loads(buffer.decode("utf-8"))
                 except json.JSONDecodeError:
-                    # Need more data
+                    # Need more data - check if we've received a complete message
+                    # by looking for closing brace
+                    decoded = buffer.decode("utf-8", errors="ignore")
+                    if decoded.count("{") > 0 and decoded.count("{") == decoded.count(
+                        "}"
+                    ):
+                        # We have balanced braces but invalid JSON - likely malformed
+                        _LOGGER.warning(
+                            "Received malformed JSON response: %s", decoded[:200]
+                        )
+                        raise BarcoApiError(-1, "Malformed JSON response") from None
                     continue
+                else:
+                    _LOGGER.debug(
+                        "Successfully parsed response after %d chunks", chunk_count
+                    )
+                    return response
+
+            # If we exit the loop, we've hit max chunks
+            raise BarcoApiError(-1, f"Too many read attempts (>{max_chunks})")
 
         except TimeoutError as err:
             raise BarcoConnectionError("Response timeout") from err

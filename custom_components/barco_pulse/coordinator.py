@@ -80,13 +80,57 @@ class BarcoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "firmware_version": result.get("system.firmwareversion"),
         }
 
+    def _parse_float_properties(
+        self, results: dict[str, Any], data: dict[str, Any]
+    ) -> None:
+        """Parse float properties from results into data dict."""
+        property_mappings = [
+            ("laser_power", "illumination.sources.laser.power"),
+            ("brightness", "image.brightness"),
+            ("contrast", "image.contrast"),
+            ("saturation", "image.saturation"),
+        ]
+
+        for key, result_key in property_mappings:
+            if result_key in results:
+                value = results[result_key]
+                try:
+                    data[key] = float(value) if value is not None else None
+                except (ValueError, TypeError) as err:
+                    _LOGGER.warning("Invalid %s value: %s (%s)", key, value, err)
+                    data[key] = None
+
+    def _parse_laser_constraints(
+        self, results: dict[str, Any], data: dict[str, Any]
+    ) -> None:
+        """Parse laser power constraints from results into data dict."""
+        laser_min = results.get("illumination.sources.laser.power.min")
+        laser_max = results.get("illumination.sources.laser.power.max")
+
+        if laser_min is not None and laser_max is not None:
+            try:
+                data["laser_min"] = float(laser_min)
+                data["laser_max"] = float(laser_max)
+                _LOGGER.debug("Laser constraints: min=%s, max=%s", laser_min, laser_max)
+            except (ValueError, TypeError) as err:
+                _LOGGER.warning("Invalid laser constraints: %s", err)
+                data["laser_min"] = 0.0
+                data["laser_max"] = 100.0
+        else:
+            # Use defaults if not available
+            data["laser_min"] = 0.0
+            data["laser_max"] = 100.0
+            _LOGGER.debug("Using default laser constraints (not in response)")
+
     async def _get_active_properties(self) -> dict[str, Any]:
         """Get properties only available when projector is active (on/ready)."""
         data: dict[str, Any] = {}
 
-        # Build list of properties to fetch in batch
+        # Build list of properties to fetch in batch - include laser constraints
         property_names = [
             "illumination.sources.laser.power",
+            "illumination.sources.laser.power.min",
+            "illumination.sources.laser.power.max",
             "image.window.main.source",
             "image.brightness",
             "image.contrast",
@@ -96,7 +140,7 @@ class BarcoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         ]
 
         try:
-            # Fetch properties in a single batch request
+            # Fetch all properties in a single batch request
             results = await self.device.get_properties(property_names)
 
             # Validate response type
@@ -104,24 +148,15 @@ class BarcoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 _LOGGER.warning("Invalid properties response type: %s", type(results))
                 return data
 
-            # Parse float values with safe conversion
-            for key, result_key in [
-                ("laser_power", "illumination.sources.laser.power"),
-                ("brightness", "image.brightness"),
-                ("contrast", "image.contrast"),
-                ("saturation", "image.saturation"),
-            ]:
-                if result_key in results:
-                    value = results[result_key]
-                    try:
-                        data[key] = float(value) if value is not None else None
-                    except (ValueError, TypeError) as err:
-                        _LOGGER.warning("Invalid %s value: %s (%s)", key, value, err)
-                        data[key] = None
+            # Parse float values
+            self._parse_float_properties(results, data)
 
             # Parse source
             if "image.window.main.source" in results:
                 data["source"] = results["image.window.main.source"]
+
+            # Parse laser constraints
+            self._parse_laser_constraints(results, data)
 
             # Parse preset assignments (returned as array of arrays)
             if "profile.presetassignments" in results:
@@ -137,29 +172,15 @@ class BarcoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         except BarcoStateError:
             _LOGGER.debug("Some properties not available in current state")
+            # Set default laser constraints if state error
+            data["laser_min"] = 0.0
+            data["laser_max"] = 100.0
 
         # Get available sources separately (uses different method)
         try:
             data["available_sources"] = await self.device.get_available_sources()
         except BarcoStateError:
             _LOGGER.debug("Available sources not available in current state")
-
-        # Get laser power constraints
-        try:
-            laser_min, laser_max = await self.device.get_laser_limits()
-            data["laser_min"] = laser_min
-            data["laser_max"] = laser_max
-            _LOGGER.debug("Laser constraints: min=%s, max=%s", laser_min, laser_max)
-        except BarcoStateError:
-            # Projector not in active state, use defaults
-            data["laser_min"] = 0.0
-            data["laser_max"] = 100.0
-            _LOGGER.debug("Using default laser constraints")
-        except (ValueError, TypeError) as err:
-            # Invalid constraint values, use defaults
-            _LOGGER.warning("Invalid laser constraints: %s", err)
-            data["laser_min"] = 0.0
-            data["laser_max"] = 100.0
 
         return data
 

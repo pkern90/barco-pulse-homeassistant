@@ -4,7 +4,9 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
+import time
 from functools import wraps
 from typing import TYPE_CHECKING, Any, ParamSpec, TypeVar
 
@@ -19,6 +21,10 @@ _LOGGER = logging.getLogger(__name__)
 
 P = ParamSpec("P")
 R = TypeVar("R")
+
+# Global dictionary to track last refresh time per coordinator
+_LAST_REFRESH_TIMES: dict[int, float] = {}
+_REFRESH_COOLDOWN = 0.5  # Minimum seconds between refresh requests
 
 
 def handle_api_errors(
@@ -66,14 +72,34 @@ async def safe_refresh(
     operation_name: str = "operation",
 ) -> None:
     """
-    Request coordinator refresh without failing if refresh fails.
+    Request coordinator refresh with throttling to prevent overlapping updates.
 
     Args:
         coordinator: DataUpdateCoordinator instance
         operation_name: Name of operation for logging (optional)
 
     """
+    coordinator_id = id(coordinator)
+    current_time = time.time()
+
+    # Check if we're in cooldown period
+    last_refresh = _LAST_REFRESH_TIMES.get(coordinator_id, 0)
+    time_since_last = current_time - last_refresh
+
+    if time_since_last < _REFRESH_COOLDOWN:
+        _LOGGER.debug(
+            "Skipping refresh after %s (cooldown: %.2fs remaining)",
+            operation_name,
+            _REFRESH_COOLDOWN - time_since_last,
+        )
+        return
+
+    # Update last refresh time
+    _LAST_REFRESH_TIMES[coordinator_id] = current_time
+
     try:
+        # Wait a small delay to allow multiple rapid commands to batch
+        await asyncio.sleep(0.1)
         await coordinator.async_request_refresh()
     except Exception:
         _LOGGER.warning("Failed to refresh after %s", operation_name)

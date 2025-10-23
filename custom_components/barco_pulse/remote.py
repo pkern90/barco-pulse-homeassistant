@@ -111,14 +111,18 @@ class BarcoRemote(BarcoEntity, RemoteEntity):
         - preset_<number>: Activate preset by number (e.g., "preset_5")
         - profile_<name>: Activate profile by name (e.g., "profile_Cinema")
         """
+        commands_executed = 0
         for cmd in command:
             if not isinstance(cmd, str):
                 _LOGGER.warning("Invalid command type: %s (expected str)", type(cmd))
                 continue
 
             await self._execute_command(cmd)
+            commands_executed += 1
 
-        await safe_refresh(self.coordinator, "send command")
+        # Only refresh once after all commands are executed
+        if commands_executed > 0:
+            await safe_refresh(self.coordinator, f"{commands_executed} command(s)")
 
 
 async def async_setup_entry(
