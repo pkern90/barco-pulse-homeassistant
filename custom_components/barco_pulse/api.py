@@ -60,31 +60,34 @@ class BarcoDevice:
         self._min_request_interval = 0.1  # 100ms minimum between requests
 
     async def connect(self) -> None:
-        """Establish TCP connection with auth cleanup."""
+        """Establish connection to Barco Pulse device."""
+        if self._reader and self._writer:
+            return
+
         try:
-            _LOGGER.debug("Connecting to %s:%s", self.host, self.port)
             self._reader, self._writer = await asyncio.wait_for(
                 asyncio.open_connection(self.host, self.port),
                 timeout=self.timeout,
             )
-            self._connected = True
-            _LOGGER.debug("Connected to %s:%s", self.host, self.port)
 
-            # Authenticate if auth code provided
+            # Authenticate if PIN provided
+            # Wrapped in try/except to ensure cleanup on auth failure
             if self.auth_code:
                 try:
                     await self.authenticate(self.auth_code)
-                except BarcoAuthError:
-                    # Auth failed - clean up connection
+                except Exception:
+                    # Auth failed after connection opened - must cleanup
                     await self.disconnect()
                     raise
 
         except TimeoutError as err:
-            msg = f"Connection timeout to {self.host}:{self.port}"
-            raise BarcoConnectionError(msg) from err
-        except (ConnectionError, OSError) as err:
-            msg = f"Failed to connect to {self.host}:{self.port}: {err}"
-            raise BarcoConnectionError(msg) from err
+            raise BarcoConnectionError(
+                f"Connection to {self.host}:{self.port} timed out"
+            ) from err
+        except OSError as err:
+            raise BarcoConnectionError(
+                f"Failed to connect to {self.host}:{self.port}: {err}"
+            ) from err
 
     async def disconnect(self) -> None:
         """Close the TCP connection."""
