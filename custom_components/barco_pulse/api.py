@@ -61,7 +61,7 @@ class BarcoDevice:
 
     async def connect(self) -> None:
         """Establish connection to Barco Pulse device."""
-        if self._reader and self._writer:
+        if self._connected and self._reader and self._writer:
             return
 
         try:
@@ -69,6 +69,10 @@ class BarcoDevice:
                 asyncio.open_connection(self.host, self.port),
                 timeout=self.timeout,
             )
+
+            # Mark as connected BEFORE authentication attempt
+            # This ensures proper cleanup if auth fails
+            self._connected = True
 
             # Authenticate if PIN provided
             # Wrapped in try/except to ensure cleanup on auth failure
@@ -80,11 +84,21 @@ class BarcoDevice:
                     await self.disconnect()
                     raise
 
+            _LOGGER.debug("Connected to %s:%s", self.host, self.port)
+
         except TimeoutError as err:
+            # Ensure we clean up partial connection state
+            self._connected = False
+            self._reader = None
+            self._writer = None
             raise BarcoConnectionError(
                 f"Connection to {self.host}:{self.port} timed out"
             ) from err
         except OSError as err:
+            # Ensure we clean up partial connection state
+            self._connected = False
+            self._reader = None
+            self._writer = None
             raise BarcoConnectionError(
                 f"Failed to connect to {self.host}:{self.port}: {err}"
             ) from err
@@ -105,16 +119,13 @@ class BarcoDevice:
 
     async def _ensure_connected(self) -> None:
         """Ensure connection is active, reconnect if needed."""
-        stale = (
-            self._connected
-            and self._reader
-            and self._writer
-            and self._writer.is_closing()
-        )
-        if stale:
+        # Check if writer is closing (connection dropped)
+        if self._writer and self._writer.is_closing():
             _LOGGER.warning("Connection closed, reconnecting...")
             # Properly clean up stale connection before reconnecting
             await self.disconnect()
+
+        # Reconnect if not connected
         if not self._connected:
             await self.connect()
 
