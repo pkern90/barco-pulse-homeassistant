@@ -169,12 +169,18 @@ Added comprehensive logging to track:
 # NEW CODE - FIXED
 async def _read_with_overall_timeout() -> dict[str, Any]:
     """Inner function to read response with per-chunk and overall timeout."""
-    chunk_timeout = 2.0  # ✅ 2 seconds per chunk (reasonable)
+    # First chunk gets more time (processing + network latency)
+    first_chunk_timeout = 5.0  # ✅ 5 seconds for first chunk
+    subsequent_chunk_timeout = 1.0  # ✅ 1 second for subsequent chunks
 
     while chunk_count < max_chunks:
+        # Use longer timeout for first chunk, shorter for rest
+        chunk_timeout = (
+            first_chunk_timeout if chunk_count == 1 else subsequent_chunk_timeout
+        )
         chunk = await asyncio.wait_for(
             self._reader.read(4096),
-            timeout=chunk_timeout,  # ✅ Per-chunk timeout
+            timeout=chunk_timeout,
         )
         # ... process chunk ...
 
@@ -186,13 +192,14 @@ return await asyncio.wait_for(
 ```
 
 This ensures:
-- **Per-chunk timeout**: 2 seconds (prevents individual read hangs)
+- **First chunk timeout**: 5 seconds (allows for processing + network latency)
+- **Subsequent chunk timeout**: 1 second (data already flowing)
 - **Overall timeout**: 10 seconds (prevents cumulative timeout explosion)
 - **Maximum wait time**: 10 seconds total, not 2,560 seconds
 - **Responsive**: Integration never hangs for more than 10 seconds
 - **Predictable**: Timeout behavior is deterministic and bounded
 
-## Configuration Added
+**Update (Oct 25, 2025)**: Increased first chunk timeout from 2s to 5s after discovering that projector responses can take 3-4 seconds to start, especially when device is busy or processing state transitions.## Configuration Added
 
 New constant in `const.py`:
 

@@ -192,12 +192,20 @@ class BarcoDevice:
 
             buffer = b""
             max_buffer_size = 1024 * 1024  # 1MB limit to prevent memory leaks
-            chunk_timeout = 2.0  # 2 second timeout per chunk
+            # First chunk gets more time (processing + network latency)
+            first_chunk_timeout = 5.0  # 5 seconds for first chunk
+            subsequent_chunk_timeout = 1.0  # 1 second for subsequent chunks
             chunk_count = 0
             max_chunks = 256  # Limit iterations to prevent infinite loops
 
             while chunk_count < max_chunks:
                 chunk_count += 1
+                # Use longer timeout for first chunk, shorter for rest
+                chunk_timeout = (
+                    first_chunk_timeout
+                    if chunk_count == 1
+                    else subsequent_chunk_timeout
+                )
                 try:
                     chunk = await asyncio.wait_for(
                         self._reader.read(4096),
@@ -205,7 +213,8 @@ class BarcoDevice:
                     )
                 except TimeoutError as err:
                     raise BarcoConnectionError(
-                        f"Chunk read timeout after {chunk_count} chunks"
+                        f"Chunk read timeout after {chunk_count} chunks "
+                        f"({chunk_timeout}s timeout)"
                     ) from err
 
                 if not chunk:
@@ -377,9 +386,23 @@ class BarcoDevice:
                         pass
                 raise BarcoConnectionError(f"Failed to send request: {err}") from err
 
-            # Read response
-            response = await self._read_json_response()
-            _LOGGER.debug("Received response: %s", response)
+            # Read response with connection cleanup on failure
+            try:
+                response = await self._read_json_response()
+                _LOGGER.debug("Received response: %s", response)
+            except BarcoConnectionError:
+                # Clean up broken connection on read failure/timeout
+                writer = self._writer
+                self._connected = False
+                self._reader = None
+                self._writer = None
+                if writer:
+                    try:
+                        writer.close()
+                        await writer.wait_closed()
+                    except (ConnectionError, OSError):
+                        pass
+                raise  # Re-raise the original error
 
             # Parse and return result
             return self._parse_jsonrpc_response(response, request_id)

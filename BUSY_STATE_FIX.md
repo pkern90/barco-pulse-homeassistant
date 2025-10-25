@@ -81,7 +81,7 @@ The command will:
 This fix addresses the error spam but doesn't solve the underlying OOM (Out of Memory) issue you experienced. The OOM was caused by:
 
 1. **Connection leaks** (fixed in previous commit)
-2. **Timeout multiplication** (fixed in previous commit)  
+2. **Timeout multiplication** (fixed in previous commit)
 3. **Old unfixed code still running** (requires HA restart)
 
 ## Action Required
