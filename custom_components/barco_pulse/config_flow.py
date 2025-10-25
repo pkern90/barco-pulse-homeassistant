@@ -49,7 +49,8 @@ class BarcoConfigFlow(ConfigFlow, domain=DOMAIN):
             # Extract configuration
             host = user_input[CONF_HOST]
             port = user_input.get(CONF_PORT, DEFAULT_PORT)
-            auth_code = user_input.get(CONF_AUTH_CODE)
+            # Convert empty string to None for auth_code
+            auth_code = user_input.get(CONF_AUTH_CODE) or None
 
             # Create device instance
             device = BarcoDevice(
@@ -95,7 +96,11 @@ class BarcoConfigFlow(ConfigFlow, domain=DOMAIN):
     ) -> ConfigFlowResult:
         """Handle reconfiguration of the integration."""
         errors: dict[str, str] = {}
-        entry = self.hass.config_entries.async_get_entry(self.context["entry_id"])
+        entry_id = self.context.get("entry_id")
+        if not entry_id:
+            return self.async_abort(reason="reconfigure_failed")
+
+        entry = self.hass.config_entries.async_get_entry(entry_id)
 
         if entry is None:
             return self.async_abort(reason="reconfigure_failed")
@@ -104,7 +109,8 @@ class BarcoConfigFlow(ConfigFlow, domain=DOMAIN):
             # Extract configuration
             host = user_input[CONF_HOST]
             port = user_input.get(CONF_PORT, DEFAULT_PORT)
-            auth_code = user_input.get(CONF_AUTH_CODE)
+            # Convert empty string to None for auth_code
+            auth_code = user_input.get(CONF_AUTH_CODE) or None
 
             # Create device instance
             device = BarcoDevice(
@@ -139,7 +145,7 @@ class BarcoConfigFlow(ConfigFlow, domain=DOMAIN):
                     await device.disconnect()
 
         # Use existing entry data as defaults if no user input yet
-        defaults = entry.data if user_input is None else user_input
+        defaults = dict(entry.data) if user_input is None else user_input
 
         return self.async_show_form(
             step_id="reconfigure",

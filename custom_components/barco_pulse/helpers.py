@@ -9,6 +9,7 @@ import logging
 import time
 from functools import wraps
 from typing import TYPE_CHECKING, Any, ParamSpec, TypeVar
+from weakref import WeakValueDictionary
 
 from homeassistant.exceptions import HomeAssistantError
 
@@ -22,9 +23,12 @@ _LOGGER = logging.getLogger(__name__)
 P = ParamSpec("P")
 R = TypeVar("R")
 
-# Global dictionary to track last refresh time per coordinator
+# Track last refresh time per coordinator using weak references
+# This prevents memory leaks when coordinators are deleted
 _LAST_REFRESH_TIMES: dict[int, float] = {}
+_COORDINATOR_REFS: WeakValueDictionary[int, Any] = WeakValueDictionary()
 _REFRESH_COOLDOWN = 0.5  # Minimum seconds between refresh requests
+_CLEANUP_THRESHOLD = 100  # Clean up stale entries when dict grows beyond this
 
 
 def handle_api_errors(
@@ -82,6 +86,10 @@ async def safe_refresh(
     coordinator_id = id(coordinator)
     current_time = time.time()
 
+    # Store weak reference to coordinator to enable cleanup
+    if coordinator_id not in _COORDINATOR_REFS:
+        _COORDINATOR_REFS[coordinator_id] = coordinator
+
     # Check if we're in cooldown period
     last_refresh = _LAST_REFRESH_TIMES.get(coordinator_id, 0)
     time_since_last = current_time - last_refresh
@@ -96,6 +104,15 @@ async def safe_refresh(
 
     # Update last refresh time
     _LAST_REFRESH_TIMES[coordinator_id] = current_time
+
+    # Clean up stale entries (coordinators that no longer exist)
+    # This runs periodically to prevent memory leaks
+    if len(_LAST_REFRESH_TIMES) > _CLEANUP_THRESHOLD:
+        stale_ids = [cid for cid in _LAST_REFRESH_TIMES if cid not in _COORDINATOR_REFS]
+        for cid in stale_ids:
+            _LAST_REFRESH_TIMES.pop(cid, None)
+        if stale_ids:
+            _LOGGER.debug("Cleaned up %d stale refresh entries", len(stale_ids))
 
     try:
         # Wait a small delay to allow multiple rapid commands to batch

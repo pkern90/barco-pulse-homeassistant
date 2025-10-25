@@ -31,7 +31,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Extract configuration
     host = entry.data[CONF_HOST]
     port = entry.data.get(CONF_PORT, DEFAULT_PORT)
-    auth_code = entry.data.get(CONF_AUTH_CODE)
+    # Convert empty string to None for auth_code
+    auth_code = entry.data.get(CONF_AUTH_CODE) or None
 
     # Create device instance
     device = BarcoDevice(

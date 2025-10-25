@@ -85,15 +85,9 @@ class BarcoPresetSelect(BarcoEntity, SelectEntity):
     @property
     def options(self) -> list[str]:
         """Return the list of available presets."""
-        profiles = self.coordinator.data.get("profiles", [])
-
-        # If no profiles exist, show message
-        if not profiles:
-            return ["No profiles configured"]
-
         # Presets are numbered 0-29 (30 total slots)
-        # Show all presets regardless of assignment
-        return [f"Preset {preset_num}" for preset_num in range(30)]
+        # Always show all presets; users can assign profiles to any slot
+        return [f"Preset {preset_num}" for preset_num in range(PRESET_MAX_NUMBER + 1)]
 
     @property
     def available(self) -> bool:

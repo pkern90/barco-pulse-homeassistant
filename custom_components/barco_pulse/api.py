@@ -1,6 +1,6 @@
 """JSON-RPC API client for Barco Pulse projector."""
 
-# ruff: noqa: TRY003, EM101, EM102
+# ruff: noqa: TRY003, EM101, EM102, TRY301
 
 from __future__ import annotations
 
@@ -199,37 +199,17 @@ class BarcoDevice:
         if not self._reader:
             raise BarcoConnectionError("Not connected")
 
-        async def _read_with_overall_timeout() -> dict[str, Any]:
-            """Inner function to read response with per-chunk and overall timeout."""
-            # Assert reader is available (already checked above)
-            assert self._reader is not None  # noqa: S101
+        buffer = b""
+        max_buffer_size = 1024 * 1024  # 1MB limit to prevent memory leaks
+        chunk_count = 0
+        max_chunks = 256  # Limit iterations to prevent infinite loops
 
-            buffer = b""
-            max_buffer_size = 1024 * 1024  # 1MB limit to prevent memory leaks
-            # First chunk gets more time (processing + network latency)
-            first_chunk_timeout = 5.0  # 5 seconds for first chunk
-            subsequent_chunk_timeout = 1.0  # 1 second for subsequent chunks
-            chunk_count = 0
-            max_chunks = 256  # Limit iterations to prevent infinite loops
-
+        # Apply overall timeout to the entire read operation
+        try:
             while chunk_count < max_chunks:
                 chunk_count += 1
-                # Use longer timeout for first chunk, shorter for rest
-                chunk_timeout = (
-                    first_chunk_timeout
-                    if chunk_count == 1
-                    else subsequent_chunk_timeout
-                )
-                try:
-                    chunk = await asyncio.wait_for(
-                        self._reader.read(4096),
-                        timeout=chunk_timeout,
-                    )
-                except TimeoutError as err:
-                    raise BarcoConnectionError(
-                        f"Chunk read timeout after {chunk_count} chunks "
-                        f"({chunk_timeout}s timeout)"
-                    ) from err
+
+                chunk = await self._reader.read(4096)
 
                 if not chunk:
                     raise BarcoConnectionError("Connection closed by projector")
@@ -267,16 +247,6 @@ class BarcoDevice:
             # If we exit the loop, we've hit max chunks
             raise BarcoApiError(-1, f"Too many read attempts (>{max_chunks})")
 
-        # Apply overall timeout to the entire read operation
-        try:
-            return await asyncio.wait_for(
-                _read_with_overall_timeout(),
-                timeout=self.timeout,
-            )
-        except TimeoutError as err:
-            raise BarcoConnectionError(
-                f"Overall response timeout ({self.timeout}s)"
-            ) from err
         except UnicodeDecodeError as err:
             raise BarcoApiError(-1, f"Invalid response encoding: {err}") from err
 
@@ -330,6 +300,19 @@ class BarcoDevice:
         # Return result
         return response.get("result")
 
+    async def _cleanup_connection(self) -> None:
+        """Clean up broken connection and reset state."""
+        writer = self._writer
+        self._connected = False
+        self._reader = None
+        self._writer = None
+        if writer:
+            try:
+                writer.close()
+                await writer.wait_closed()
+            except (ConnectionError, OSError):
+                pass
+
     async def _send_request(
         self,
         method: str,
@@ -379,44 +362,34 @@ class BarcoDevice:
 
             _LOGGER.debug("Sending request: %s", json_payload)
 
-            # Send request with connection error handling
+            # Send request and read response with overall timeout
             try:
                 if not self._writer:
                     raise BarcoConnectionError("Not connected")
 
-                self._writer.write(http_request.encode("utf-8"))
-                await self._writer.drain()
+                # Wrap both send and receive in a single timeout
+                async def _send_and_receive() -> dict[str, Any]:
+                    self._writer.write(http_request.encode("utf-8"))  # type: ignore[union-attr]
+                    await self._writer.drain()  # type: ignore[union-attr]
+                    return await self._read_json_response()
 
-            except (ConnectionError, OSError) as err:
-                writer = self._writer
-                self._connected = False
-                self._reader = None
-                self._writer = None
-                if writer:
-                    try:
-                        writer.close()
-                        await writer.wait_closed()
-                    except (ConnectionError, OSError):
-                        pass
-                raise BarcoConnectionError(f"Failed to send request: {err}") from err
-
-            # Read response with connection cleanup on failure
-            try:
-                response = await self._read_json_response()
+                response = await asyncio.wait_for(
+                    _send_and_receive(),
+                    timeout=self.timeout,
+                )
                 _LOGGER.debug("Received response: %s", response)
+
+            except TimeoutError as err:
+                await self._cleanup_connection()
+                raise BarcoConnectionError(
+                    f"Request timeout after {self.timeout}s"
+                ) from err
+            except (ConnectionError, OSError) as err:
+                await self._cleanup_connection()
+                raise BarcoConnectionError(f"Failed to send request: {err}") from err
             except BarcoConnectionError:
-                # Clean up broken connection on read failure/timeout
-                writer = self._writer
-                self._connected = False
-                self._reader = None
-                self._writer = None
-                if writer:
-                    try:
-                        writer.close()
-                        await writer.wait_closed()
-                    except (ConnectionError, OSError):
-                        pass
-                raise  # Re-raise the original error
+                await self._cleanup_connection()
+                raise
 
             # Parse and return result
             return self._parse_jsonrpc_response(response, request_id)

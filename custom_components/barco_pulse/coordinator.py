@@ -51,7 +51,6 @@ class BarcoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             update_interval=DEFAULT_POLLING_INTERVAL,
         )
         self.device = device
-        self._connection_lock = asyncio.Lock()
         self._update_lock = asyncio.Lock()
         self._last_update = 0.0
         # Generate stable fallback ID immediately (never None)

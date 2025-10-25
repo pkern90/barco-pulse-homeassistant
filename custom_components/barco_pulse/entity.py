@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from homeassistant.helpers.entity import DeviceInfo
+from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import ATTRIBUTION, DOMAIN
@@ -19,13 +19,15 @@ class BarcoEntity(CoordinatorEntity[BarcoDataUpdateCoordinator]):
         """Initialize the entity."""
         super().__init__(coordinator)
 
-        # Build device info
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, coordinator.config_entry.entry_id)},
-            name=coordinator.config_entry.title,
+    @property
+    def device_info(self) -> DeviceInfo:
+        """Return device info."""
+        return DeviceInfo(
+            identifiers={(DOMAIN, self.coordinator.config_entry.entry_id)},
+            name=self.coordinator.config_entry.title,
             manufacturer="Barco",
-            model=coordinator.data.get("model", "Pulse"),
-            sw_version=coordinator.data.get("firmware_version"),
+            model=self.coordinator.data.get("model", "Pulse"),
+            sw_version=self.coordinator.data.get("firmware_version"),
         )
 
     @property
