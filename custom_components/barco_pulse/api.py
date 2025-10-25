@@ -22,6 +22,7 @@ _LOGGER = logging.getLogger(__name__)
 
 # JSON-RPC error codes
 ERROR_PROPERTY_NOT_FOUND = -32601
+ERROR_DEVICE_BUSY = -32009  # Device busy transitioning states
 
 
 class BarcoDevice:
@@ -293,6 +294,12 @@ class BarcoDevice:
 
             # Error -32601 indicates property not found (usually state dependency)
             if code == ERROR_PROPERTY_NOT_FOUND:
+                raise BarcoStateError(message)
+
+            # Error -32009 indicates device busy (transitioning states)
+            # This is expected during power on/off transitions
+            if code == ERROR_DEVICE_BUSY:
+                _LOGGER.debug("Device busy: %s", message)
                 raise BarcoStateError(message)
 
             raise BarcoApiError(code, message)
