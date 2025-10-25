@@ -109,9 +109,8 @@ class BarcoDevice:
         )
         if stale:
             _LOGGER.warning("Connection closed, reconnecting...")
-            self._connected = False
-            self._reader = None
-            self._writer = None
+            # Properly clean up stale connection before reconnecting
+            await self.disconnect()
         if not self._connected:
             await self.connect()
 
@@ -185,20 +184,28 @@ class BarcoDevice:
         if not self._reader:
             raise BarcoConnectionError("Not connected")
 
-        try:
-            # Read until we get valid JSON
+        async def _read_with_overall_timeout() -> dict[str, Any]:
+            """Inner function to read response with per-chunk and overall timeout."""
+            # Assert reader is available (already checked above)
+            assert self._reader is not None  # noqa: S101
+
             buffer = b""
             max_buffer_size = 1024 * 1024  # 1MB limit to prevent memory leaks
-            read_timeout = self.timeout  # Use configured timeout
+            chunk_timeout = 2.0  # 2 second timeout per chunk
             chunk_count = 0
             max_chunks = 256  # Limit iterations to prevent infinite loops
 
             while chunk_count < max_chunks:
                 chunk_count += 1
-                chunk = await asyncio.wait_for(
-                    self._reader.read(4096),
-                    timeout=read_timeout,
-                )
+                try:
+                    chunk = await asyncio.wait_for(
+                        self._reader.read(4096),
+                        timeout=chunk_timeout,
+                    )
+                except TimeoutError as err:
+                    raise BarcoConnectionError(
+                        f"Chunk read timeout after {chunk_count} chunks"
+                    ) from err
 
                 if not chunk:
                     raise BarcoConnectionError("Connection closed by projector")
@@ -236,8 +243,16 @@ class BarcoDevice:
             # If we exit the loop, we've hit max chunks
             raise BarcoApiError(-1, f"Too many read attempts (>{max_chunks})")
 
+        # Apply overall timeout to the entire read operation
+        try:
+            return await asyncio.wait_for(
+                _read_with_overall_timeout(),
+                timeout=self.timeout,
+            )
         except TimeoutError as err:
-            raise BarcoConnectionError("Response timeout") from err
+            raise BarcoConnectionError(
+                f"Overall response timeout ({self.timeout}s)"
+            ) from err
         except UnicodeDecodeError as err:
             raise BarcoApiError(-1, f"Invalid response encoding: {err}") from err
 

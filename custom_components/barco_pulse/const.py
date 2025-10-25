@@ -15,6 +15,8 @@ MODEL_PREFIX = "Pulse"
 # Network configuration
 DEFAULT_PORT = 9090
 DEFAULT_TIMEOUT = 10
+# Close connections after each update to prevent leaks
+CLOSE_CONNECTION_AFTER_UPDATE = True
 
 
 class PowerState(StrEnum):

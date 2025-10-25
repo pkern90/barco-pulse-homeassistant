@@ -5,7 +5,6 @@
 from __future__ import annotations
 
 import asyncio
-import contextlib
 import hashlib
 import logging
 import time
@@ -15,6 +14,7 @@ from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import (
+    CLOSE_CONNECTION_AFTER_UPDATE,
     DEFAULT_POLLING_INTERVAL,
     NAME,
     POLLING_INTERVALS,
@@ -240,17 +240,49 @@ class BarcoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     )
 
                 _LOGGER.debug("Updated data: %s", data)
+
+                # Close connection after successful update to prevent leaks
+                # Connection will be re-established on next update
+                if CLOSE_CONNECTION_AFTER_UPDATE:
+                    try:
+                        await self.device.disconnect()
+                        _LOGGER.debug("Closed connection after update")
+                    except (BarcoConnectionError, OSError) as err:
+                        _LOGGER.debug("Error closing connection: %s", err)
+
                 return data
 
             except BarcoAuthError as err:
+                _LOGGER.exception(
+                    "Authentication failed for %s:%s - check auth code",
+                    self.device.host,
+                    self.device.port,
+                )
                 raise ConfigEntryAuthFailed(f"Authentication failed: {err}") from err
             except BarcoConnectionError as err:
-                with contextlib.suppress(BarcoConnectionError, OSError):
+                _LOGGER.warning(
+                    "Connection error to %s:%s: %s",
+                    self.device.host,
+                    self.device.port,
+                    err,
+                )
+                # Clean up connection on failure
+                try:
                     await self.device.disconnect()
+                except (BarcoConnectionError, OSError):
+                    _LOGGER.debug("Error during connection cleanup", exc_info=True)
                 raise UpdateFailed(f"Connection error: {err}") from err
             except Exception as err:
-                with contextlib.suppress(BarcoConnectionError, OSError):
+                _LOGGER.exception(
+                    "Unexpected error updating %s:%s",
+                    self.device.host,
+                    self.device.port,
+                )
+                # Clean up connection on unexpected error
+                try:
                     await self.device.disconnect()
+                except (BarcoConnectionError, OSError):
+                    _LOGGER.debug("Error during connection cleanup", exc_info=True)
                 raise UpdateFailed(f"Unexpected error: {err}") from err
 
     @property
