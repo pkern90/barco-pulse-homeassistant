@@ -1,6 +1,9 @@
 """Data update coordinator for Barco Pulse integration."""
 
 # ruff: noqa: TRY003, EM102
+# Inline exception message literals are necessary for Home Assistant debugging.
+# Including contextual information (host, port, state) directly in exception
+# messages helps with troubleshooting integration issues in HA logs.
 
 from __future__ import annotations
 
@@ -14,11 +17,11 @@ from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import (
+    ACTIVE_STATES,
     CLOSE_CONNECTION_AFTER_UPDATE,
     DEFAULT_POLLING_INTERVAL,
     NAME,
     POLLING_INTERVALS,
-    POWER_STATES_ACTIVE,
     PRESET_ASSIGNMENT_TUPLE_SIZE,
     PowerState,
 )
@@ -35,6 +38,9 @@ if TYPE_CHECKING:
     from .api import BarcoDevice
 
 _LOGGER = logging.getLogger(__name__)
+
+# Coordinator update rate limiting
+MIN_UPDATE_INTERVAL = 1.0  # Minimum seconds between coordinator updates
 
 
 class BarcoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
@@ -54,15 +60,17 @@ class BarcoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._update_lock = asyncio.Lock()
         self._last_update = 0.0
         # Generate stable fallback ID immediately (never None)
-        self._fallback_id = hashlib.md5(  # noqa: S324
-            f"{device.host}:{device.port}".encode()
-        ).hexdigest()[:16]
+        # Use blake2b for non-cryptographic hashing (faster than SHA256)
+        self._fallback_id = hashlib.blake2b(
+            f"{device.host}:{device.port}".encode(),
+            digest_size=8,
+        ).hexdigest()
 
     async def _enforce_rate_limit(self) -> None:
-        """Enforce minimum 1-second interval between updates."""
+        """Enforce minimum interval between updates to prevent overwhelming device."""
         elapsed = time.time() - self._last_update
-        if elapsed < 1.0:
-            await asyncio.sleep(1.0 - elapsed)
+        if elapsed < MIN_UPDATE_INTERVAL:
+            await asyncio.sleep(MIN_UPDATE_INTERVAL - elapsed)
         self._last_update = time.time()
 
     async def _get_info_properties(self) -> dict[str, Any]:
@@ -270,9 +278,13 @@ class BarcoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         data.update(info)
 
         # If projector is active, get additional properties
-        if state in POWER_STATES_ACTIVE:
-            active_data = await self._get_active_properties()
-            data.update(active_data)
+        try:
+            if PowerState(state) in ACTIVE_STATES:
+                active_data = await self._get_active_properties()
+                data.update(active_data)
+        except ValueError:
+            # Invalid state string, skip active properties
+            _LOGGER.debug("Unknown state %s, skipping active properties", state)
 
         # Update polling interval based on current state
         try:

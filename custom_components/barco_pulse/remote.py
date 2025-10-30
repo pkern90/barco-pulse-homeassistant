@@ -7,9 +7,9 @@ from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.remote import RemoteEntity
 
-from .const import POWER_STATES_ACTIVE, PRESET_MAX_NUMBER
-from .entity import BarcoEntity
-from .helpers import handle_api_errors, safe_refresh
+from .const import ACTIVE_STATES, PowerState
+from .entity import BarcoEntity, BarcoPowerMixin
+from .helpers import handle_api_errors, parse_preset_command, safe_refresh
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -24,7 +24,7 @@ if TYPE_CHECKING:
 _LOGGER = logging.getLogger(__name__)
 
 
-class BarcoRemote(BarcoEntity, RemoteEntity):
+class BarcoRemote(BarcoPowerMixin, BarcoEntity, RemoteEntity):
     """Barco Pulse remote entity."""
 
     _attr_translation_key = "remote"
@@ -37,27 +37,11 @@ class BarcoRemote(BarcoEntity, RemoteEntity):
     @property
     def is_on(self) -> bool:
         """Return True if the projector is on."""
-        return self.coordinator.data.get("state") in POWER_STATES_ACTIVE
-
-    async def async_turn_on(self, **_kwargs: Any) -> None:
-        """Turn the projector on with error handling."""
-        await self._turn_on_with_refresh()
-
-    @handle_api_errors
-    async def _turn_on_with_refresh(self) -> None:
-        """Execute power on command."""
-        await self.coordinator.device.power_on()
-        await safe_refresh(self.coordinator, "power on")
-
-    async def async_turn_off(self, **_kwargs: Any) -> None:
-        """Turn the projector off with error handling."""
-        await self._turn_off_with_refresh()
-
-    @handle_api_errors
-    async def _turn_off_with_refresh(self) -> None:
-        """Execute power off command."""
-        await self.coordinator.device.power_off()
-        await safe_refresh(self.coordinator, "power off")
+        state = self.coordinator.data.get("state")
+        try:
+            return PowerState(state) in ACTIVE_STATES
+        except (ValueError, TypeError):
+            return False
 
     @handle_api_errors
     async def _execute_command(self, cmd: str) -> None:
@@ -71,25 +55,14 @@ class BarcoRemote(BarcoEntity, RemoteEntity):
             await self.coordinator.device.set_source(source_name)
 
         elif cmd.startswith("preset_"):
-            # Extract preset number (e.g., "preset_5" -> 5)
-            try:
-                preset_str = cmd[7:]
-                preset_num = int(preset_str)
+            # Parse preset command (e.g., "preset_5" -> 5)
+            preset_num = parse_preset_command(cmd)
 
-                # Validate preset number range
-                if preset_num < 0 or preset_num > PRESET_MAX_NUMBER:
-                    _LOGGER.warning(
-                        "Preset number %d out of range [0, %d]",
-                        preset_num,
-                        PRESET_MAX_NUMBER,
-                    )
-                    return
-
-                await self.coordinator.device.activate_preset(preset_num)
-
-            except (ValueError, IndexError):
-                _LOGGER.warning("Invalid preset number in command: %s", cmd)
+            if preset_num is None:
+                _LOGGER.warning("Invalid preset command: %s", cmd)
                 return
+
+            await self.coordinator.device.activate_preset(preset_num)
 
         elif cmd.startswith("profile_"):
             # Extract profile name (e.g., "profile_Cinema" -> "Cinema")

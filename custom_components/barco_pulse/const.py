@@ -15,8 +15,9 @@ MODEL_PREFIX = "Pulse"
 # Network configuration
 DEFAULT_PORT = 9090
 DEFAULT_TIMEOUT = 10
-# Close connections after each update to prevent leaks
-CLOSE_CONNECTION_AFTER_UPDATE = True
+# Keep persistent connections for better performance
+# Connection cleanup is handled on errors and shutdown
+CLOSE_CONNECTION_AFTER_UPDATE = False
 
 
 class PowerState(StrEnum):
@@ -61,13 +62,6 @@ POLLING_INTERVALS: dict[PowerState, timedelta] = {
 }
 
 DEFAULT_POLLING_INTERVAL = timedelta(seconds=10)
-
-# Legacy constants (deprecated, use ACTIVE_STATES instead)
-INTERVAL_FAST = timedelta(seconds=10)
-INTERVAL_SLOW = timedelta(seconds=60)
-POWER_STATES_ACTIVE = ["on", "ready"]
-POWER_STATES_TRANSITIONAL = ["conditioning", "deconditioning"]
-POWER_STATES_STANDBY = ["standby", "eco", "boot"]
 
 # Configuration keys
 CONF_AUTH_CODE = "auth_code"
