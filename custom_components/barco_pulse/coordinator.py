@@ -1,6 +1,6 @@
 """Data update coordinator for Barco Pulse integration."""
 
-# ruff: noqa: TRY003, EM102, TRY300
+# ruff: noqa: TRY003, EM102
 
 from __future__ import annotations
 
@@ -221,7 +221,8 @@ class BarcoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     await self.device.disconnect()
                 except (BarcoConnectionError, OSError):
                     _LOGGER.debug("Error during connection cleanup", exc_info=True)
-                raise UpdateFailed("Update operation timed out") from err
+                msg = "Update operation timed out"
+                raise UpdateFailed(msg) from err
             except BarcoAuthError as err:
                 _LOGGER.exception(
                     "Authentication failed for %s:%s - check auth code",
@@ -276,9 +277,7 @@ class BarcoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # Update polling interval based on current state
         try:
             power_state = PowerState(state)
-            new_interval = POLLING_INTERVALS.get(
-                power_state, DEFAULT_POLLING_INTERVAL
-            )
+            new_interval = POLLING_INTERVALS.get(power_state, DEFAULT_POLLING_INTERVAL)
         except ValueError:
             # Invalid state string, use default
             new_interval = DEFAULT_POLLING_INTERVAL

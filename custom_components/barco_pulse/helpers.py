@@ -1,10 +1,9 @@
 """Helper functions for Barco Pulse integration."""
 
-# ruff: noqa: BLE001, UP047
+# ruff: noqa: UP047
 
 from __future__ import annotations
 
-import asyncio
 import logging
 import time
 from functools import wraps
