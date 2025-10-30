@@ -78,6 +78,9 @@ async def safe_refresh(
     """
     Request coordinator refresh with throttling to prevent overlapping updates.
 
+    This function schedules a background refresh without blocking the caller,
+    preventing Home Assistant from becoming unresponsive during power operations.
+
     Args:
         coordinator: DataUpdateCoordinator instance
         operation_name: Name of operation for logging (optional)
@@ -114,9 +117,10 @@ async def safe_refresh(
         if stale_ids:
             _LOGGER.debug("Cleaned up %d stale refresh entries", len(stale_ids))
 
-    try:
-        # Wait a small delay to allow multiple rapid commands to batch
-        await asyncio.sleep(0.1)
-        await coordinator.async_request_refresh()
-    except Exception:
-        _LOGGER.warning("Failed to refresh after %s", operation_name)
+    # Schedule refresh as background task - don't await to prevent blocking
+    # The coordinator will handle any errors internally
+    _LOGGER.debug("Scheduling background refresh after %s", operation_name)
+    coordinator.hass.async_create_task(
+        coordinator.async_request_refresh(),
+        f"barco_pulse_refresh_{operation_name}",
+    )
