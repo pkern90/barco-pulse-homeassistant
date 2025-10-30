@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -34,3 +36,31 @@ class BarcoEntity(CoordinatorEntity[BarcoDataUpdateCoordinator]):
     def available(self) -> bool:
         """Return if entity is available."""
         return self.coordinator.last_update_success
+
+
+class BarcoPowerMixin:
+    """Mixin for entities that support power on/off commands."""
+
+    coordinator: BarcoDataUpdateCoordinator
+
+    async def async_turn_on(self, **_kwargs: Any) -> None:
+        """Turn the projector on."""
+        from .helpers import handle_api_errors, safe_refresh
+
+        @handle_api_errors
+        async def _turn_on() -> None:
+            await self.coordinator.device.power_on()
+            await safe_refresh(self.coordinator, "power on")
+
+        await _turn_on()
+
+    async def async_turn_off(self, **_kwargs: Any) -> None:
+        """Turn the projector off."""
+        from .helpers import handle_api_errors, safe_refresh
+
+        @handle_api_errors
+        async def _turn_off() -> None:
+            await self.coordinator.device.power_off()
+            await safe_refresh(self.coordinator, "power off")
+
+        await _turn_off()

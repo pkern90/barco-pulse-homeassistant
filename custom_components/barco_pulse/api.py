@@ -1,6 +1,7 @@
 """JSON-RPC API client for Barco Pulse projector."""
 
-# ruff: noqa: TRY003, EM101, EM102, TRY301
+# ruff: noqa: TRY003, EM102
+# Exception messages use f-strings for clarity (contextual host/port info)
 
 from __future__ import annotations
 
@@ -23,6 +24,12 @@ _LOGGER = logging.getLogger(__name__)
 # JSON-RPC error codes
 ERROR_PROPERTY_NOT_FOUND = -32601
 ERROR_DEVICE_BUSY = -32009  # Device busy transitioning states
+
+# Rate limiting and buffer constants
+MIN_REQUEST_INTERVAL = 0.1  # Minimum seconds between requests (100ms)
+MAX_RESPONSE_SIZE = 1024 * 1024  # Maximum response size in bytes (1MB)
+MAX_READ_CHUNKS = 256  # Maximum read iterations to prevent infinite loops
+READ_CHUNK_SIZE = 4096  # Bytes to read per chunk
 
 
 class BarcoDevice:
@@ -57,7 +64,7 @@ class BarcoDevice:
         self._request_id = 0
         self._max_request_id = 2**31 - 1  # Prevent overflow
         self._last_request_time = 0.0  # For rate limiting
-        self._min_request_interval = 0.1  # 100ms minimum between requests
+        self._min_request_interval = MIN_REQUEST_INTERVAL
 
     async def connect(self) -> None:
         """Establish connection to Barco Pulse device."""
@@ -200,16 +207,14 @@ class BarcoDevice:
             raise BarcoConnectionError("Not connected")
 
         buffer = b""
-        max_buffer_size = 1024 * 1024  # 1MB limit to prevent memory leaks
         chunk_count = 0
-        max_chunks = 256  # Limit iterations to prevent infinite loops
 
         # Apply overall timeout to the entire read operation
         try:
-            while chunk_count < max_chunks:
+            while chunk_count < MAX_READ_CHUNKS:
                 chunk_count += 1
 
-                chunk = await self._reader.read(4096)
+                chunk = await self._reader.read(READ_CHUNK_SIZE)
 
                 if not chunk:
                     raise BarcoConnectionError("Connection closed by projector")
@@ -217,9 +222,9 @@ class BarcoDevice:
                 buffer += chunk
 
                 # Prevent unbounded buffer growth
-                if len(buffer) > max_buffer_size:
+                if len(buffer) > MAX_RESPONSE_SIZE:
                     raise BarcoApiError(
-                        -1, f"Response too large (>{max_buffer_size} bytes)"
+                        -1, f"Response too large (>{MAX_RESPONSE_SIZE} bytes)"
                     )
 
                 # Try to parse as JSON
@@ -245,7 +250,7 @@ class BarcoDevice:
                     return response
 
             # If we exit the loop, we've hit max chunks
-            raise BarcoApiError(-1, f"Too many read attempts (>{max_chunks})")
+            raise BarcoApiError(-1, f"Too many read attempts (>{MAX_READ_CHUNKS})")
 
         except UnicodeDecodeError as err:
             raise BarcoApiError(-1, f"Invalid response encoding: {err}") from err

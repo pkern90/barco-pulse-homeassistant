@@ -9,7 +9,12 @@ from homeassistant.components.select import SelectEntity
 
 from .const import PRESET_MAX_NUMBER, PowerState
 from .entity import BarcoEntity
-from .helpers import handle_api_errors, safe_refresh
+from .helpers import (
+    format_preset_display,
+    handle_api_errors,
+    parse_preset_display,
+    safe_refresh,
+)
 
 if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
@@ -87,7 +92,7 @@ class BarcoPresetSelect(BarcoEntity, SelectEntity):
         """Return the list of available presets."""
         # Presets are numbered 0-29 (30 total slots)
         # Always show all presets; users can assign profiles to any slot
-        return [f"Preset {preset_num}" for preset_num in range(PRESET_MAX_NUMBER + 1)]
+        return [format_preset_display(num) for num in range(PRESET_MAX_NUMBER + 1)]
 
     @property
     def available(self) -> bool:
@@ -103,24 +108,12 @@ class BarcoPresetSelect(BarcoEntity, SelectEntity):
     @handle_api_errors
     async def _activate_preset(self, option: str) -> None:
         """Parse, validate and activate preset with proper error handling."""
-        # Validate option
-        if option not in self.options:
+        # Parse preset number from display format
+        preset_num = parse_preset_display(option)
+
+        if preset_num is None:
             msg = f"Invalid preset option: {option}"
             _LOGGER.error("Preset validation failed: %s", msg)
-            raise ValueError(msg)
-
-        # Extract preset number from "Preset X" format
-        try:
-            preset_num = int(option.split()[-1])
-        except (ValueError, IndexError) as err:
-            msg = f"Failed to parse preset option {option}"
-            _LOGGER.exception("Preset parsing failed")
-            raise ValueError(msg) from err
-
-        # Validate preset number range
-        if preset_num < 0 or preset_num > PRESET_MAX_NUMBER:
-            msg = f"Preset number {preset_num} out of range [0, {PRESET_MAX_NUMBER}]"
-            _LOGGER.error("Preset number validation failed: %s", msg)
             raise ValueError(msg)
 
         # Execute preset activation

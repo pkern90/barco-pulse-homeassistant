@@ -11,7 +11,7 @@ from homeassistant.components.binary_sensor import (
     BinarySensorEntityDescription,
 )
 
-from .const import POWER_STATES_ACTIVE
+from .const import ACTIVE_STATES, PowerState
 from .entity import BarcoEntity
 
 if TYPE_CHECKING:
@@ -23,6 +23,15 @@ if TYPE_CHECKING:
 
     from .coordinator import BarcoDataUpdateCoordinator
     from .data import BarcoRuntimeData
+
+
+def _is_power_on(data: dict[str, Any]) -> bool:
+    """Check if projector power is on based on state."""
+    state = data.get("state")
+    try:
+        return PowerState(state) in ACTIVE_STATES
+    except (ValueError, TypeError):
+        return False
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -37,7 +46,7 @@ BINARY_SENSORS: tuple[BarcoBinarySensorEntityDescription, ...] = (
         key="power",
         translation_key="power",
         device_class=BinarySensorDeviceClass.POWER,
-        value_fn=lambda data: data.get("state") in POWER_STATES_ACTIVE,
+        value_fn=_is_power_on,
     ),
 )
 

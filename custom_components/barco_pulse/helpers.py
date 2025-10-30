@@ -12,10 +12,13 @@ from weakref import WeakValueDictionary
 
 from homeassistant.exceptions import HomeAssistantError
 
+from .const import PRESET_MAX_NUMBER
 from .exceptions import BarcoConnectionError, BarcoStateError
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
+
+    from .coordinator import BarcoDataUpdateCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -30,7 +33,7 @@ _REFRESH_COOLDOWN = 0.5  # Minimum seconds between refresh requests
 _CLEANUP_THRESHOLD = 100  # Clean up stale entries when dict grows beyond this
 
 
-def handle_api_errors(
+def handle_api_errors(  # noqa: UP047
     func: Callable[P, Awaitable[R]],
 ) -> Callable[P, Awaitable[R]]:
     """
@@ -71,7 +74,7 @@ def handle_api_errors(
 
 
 async def safe_refresh(
-    coordinator: Any,
+    coordinator: "BarcoDataUpdateCoordinator",
     operation_name: str = "operation",
 ) -> None:
     """
@@ -123,3 +126,59 @@ async def safe_refresh(
         coordinator.async_request_refresh(),
         f"barco_pulse_refresh_{operation_name}",
     )
+
+
+# Preset handling utilities
+
+
+def format_preset_display(preset_num: int) -> str:
+    """Format preset number for display in UI (e.g., 5 -> 'Preset 5').
+
+    Args:
+        preset_num: Preset number (0-29)
+
+    Returns:
+        Formatted preset string for display
+    """
+    return f"Preset {preset_num}"
+
+
+def parse_preset_display(preset_str: str) -> int | None:
+    """Parse preset display string to number (e.g., 'Preset 5' -> 5).
+
+    Args:
+        preset_str: Preset string from UI
+
+    Returns:
+        Preset number, or None if invalid format
+    """
+    try:
+        parts = preset_str.split()
+        if len(parts) == 2 and parts[0] == "Preset":  # noqa: PLR2004
+            preset_num = int(parts[1])
+            if 0 <= preset_num <= PRESET_MAX_NUMBER:
+                return preset_num
+    except (ValueError, IndexError):
+        pass
+    return None
+
+
+def parse_preset_command(command: str) -> int | None:
+    """Parse preset command string to number (e.g., 'preset_5' -> 5).
+
+    Args:
+        command: Command string from remote/automation
+
+    Returns:
+        Preset number, or None if invalid format
+    """
+    if not command.startswith("preset_"):
+        return None
+
+    try:
+        preset_num = int(command[7:])
+        if 0 <= preset_num <= PRESET_MAX_NUMBER:
+            return preset_num
+    except (ValueError, IndexError):
+        pass
+    return None
