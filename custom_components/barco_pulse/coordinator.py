@@ -1,7 +1,9 @@
 """Data update coordinator for Barco Pulse integration."""
 
 # ruff: noqa: TRY003, EM102
-# Exception messages use f-strings for contextual error information
+# Inline exception message literals are necessary for Home Assistant debugging.
+# Including contextual information (host, port, state) directly in exception
+# messages helps with troubleshooting integration issues in HA logs.
 
 from __future__ import annotations
 
@@ -58,10 +60,11 @@ class BarcoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._update_lock = asyncio.Lock()
         self._last_update = 0.0
         # Generate stable fallback ID immediately (never None)
-        # Use SHA256 for better security practices (non-cryptographic use)
-        self._fallback_id = hashlib.sha256(
-            f"{device.host}:{device.port}".encode()
-        ).hexdigest()[:16]
+        # Use blake2b for non-cryptographic hashing (faster than SHA256)
+        self._fallback_id = hashlib.blake2b(
+            f"{device.host}:{device.port}".encode(),
+            digest_size=8,
+        ).hexdigest()
 
     async def _enforce_rate_limit(self) -> None:
         """Enforce minimum interval between updates to prevent overwhelming device."""
