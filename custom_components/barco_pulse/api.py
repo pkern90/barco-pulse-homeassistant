@@ -1,7 +1,7 @@
 """JSON-RPC API client for Barco Pulse projector."""
 
-# ruff: noqa: TRY003, EM102
-# Exception messages use f-strings for clarity (contextual host/port info)
+# ruff: noqa: TRY003, EM101, EM102, TRY301
+# Exception messages use literals/f-strings for clarity (contextual host/port info)
 
 from __future__ import annotations
 

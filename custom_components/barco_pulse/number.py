@@ -33,7 +33,8 @@ class BarcoNumberEntity(BarcoEntity, NumberEntity):
 
     @handle_api_errors
     async def _set_value_with_validation(self, value: float, method_name: str) -> None:
-        """Validate and set value with proper error handling.
+        """
+        Validate and set value with proper error handling.
 
         Args:
             value: The value to set
@@ -41,6 +42,7 @@ class BarcoNumberEntity(BarcoEntity, NumberEntity):
 
         Raises:
             ValueError: If value is out of range
+
         """
         # Validate bounds
         if value < self.native_min_value or value > self.native_max_value:

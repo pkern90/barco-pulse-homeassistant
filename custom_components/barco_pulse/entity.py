@@ -9,6 +9,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import ATTRIBUTION, DOMAIN
 from .coordinator import BarcoDataUpdateCoordinator
+from .helpers import handle_api_errors, safe_refresh
 
 
 class BarcoEntity(CoordinatorEntity[BarcoDataUpdateCoordinator]):
@@ -45,7 +46,6 @@ class BarcoPowerMixin:
 
     async def async_turn_on(self, **_kwargs: Any) -> None:
         """Turn the projector on."""
-        from .helpers import handle_api_errors, safe_refresh
 
         @handle_api_errors
         async def _turn_on() -> None:
@@ -56,7 +56,6 @@ class BarcoPowerMixin:
 
     async def async_turn_off(self, **_kwargs: Any) -> None:
         """Turn the projector off."""
-        from .helpers import handle_api_errors, safe_refresh
 
         @handle_api_errors
         async def _turn_off() -> None:
