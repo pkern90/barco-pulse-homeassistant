@@ -130,6 +130,9 @@ async def safe_refresh(
 
 # Preset handling utilities
 
+# Expected number of parts when splitting "Preset N" format
+PRESET_DISPLAY_PARTS_COUNT = 2
+
 
 def format_preset_display(preset_num: int) -> str:
     """
@@ -158,11 +161,12 @@ def parse_preset_display(preset_str: str) -> int | None:
     """
     try:
         parts = preset_str.split()
-        if len(parts) == 2 and parts[0] == "Preset":  # noqa: PLR2004
+        if len(parts) == PRESET_DISPLAY_PARTS_COUNT and parts[0] == "Preset":
             preset_num = int(parts[1])
             if 0 <= preset_num <= PRESET_MAX_NUMBER:
                 return preset_num
     except (ValueError, IndexError):
+        # Invalid format or number; returning None is expected for parse failures
         pass
     return None
 
@@ -186,5 +190,6 @@ def parse_preset_command(command: str) -> int | None:
         if 0 <= preset_num <= PRESET_MAX_NUMBER:
             return preset_num
     except (ValueError, IndexError):
+        # Invalid format or number; returning None is expected for parse failures
         pass
     return None
