@@ -1,6 +1,6 @@
 """Data update coordinator for Barco Pulse integration."""
 
-# ruff: noqa: TRY003, EM102, TRY300
+# ruff: noqa: TRY003, EM102
 
 from __future__ import annotations
 
@@ -204,53 +204,25 @@ class BarcoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         """Fetch data from the projector."""
         async with self._update_lock:
             try:
-                # Enforce rate limiting
-                await self._enforce_rate_limit()
-
-                # Get system state (always available)
-                state = await self.device.get_state()
-                data: dict[str, Any] = {"state": state}
-
-                # Get device info properties (always available)
-                info = await self._get_info_properties()
-                data.update(info)
-
-                # If projector is active, get additional properties
-                if state in POWER_STATES_ACTIVE:
-                    active_data = await self._get_active_properties()
-                    data.update(active_data)
-
-                # Update polling interval based on current state
+                # Wrap entire update in timeout to prevent indefinite hangs
+                # This protects against slow network or device issues
+                return await asyncio.wait_for(
+                    self._fetch_data(),
+                    timeout=30.0,  # Max 30s for entire update cycle
+                )
+            except TimeoutError as err:
+                _LOGGER.warning(
+                    "Update timeout for %s:%s - operation took >30s",
+                    self.device.host,
+                    self.device.port,
+                )
+                # Clean up connection on timeout
                 try:
-                    power_state = PowerState(state)
-                    new_interval = POLLING_INTERVALS.get(
-                        power_state, DEFAULT_POLLING_INTERVAL
-                    )
-                except ValueError:
-                    # Invalid state string, use default
-                    new_interval = DEFAULT_POLLING_INTERVAL
-
-                if self.update_interval != new_interval:
-                    self.update_interval = new_interval
-                    _LOGGER.debug(
-                        "Updated polling interval to %s for state %s",
-                        new_interval,
-                        state,
-                    )
-
-                _LOGGER.debug("Updated data: %s", data)
-
-                # Close connection after successful update to prevent leaks
-                # Connection will be re-established on next update
-                if CLOSE_CONNECTION_AFTER_UPDATE:
-                    try:
-                        await self.device.disconnect()
-                        _LOGGER.debug("Closed connection after update")
-                    except (BarcoConnectionError, OSError) as err:
-                        _LOGGER.debug("Error closing connection: %s", err)
-
-                return data
-
+                    await self.device.disconnect()
+                except (BarcoConnectionError, OSError):
+                    _LOGGER.debug("Error during connection cleanup", exc_info=True)
+                msg = "Update operation timed out"
+                raise UpdateFailed(msg) from err
             except BarcoAuthError as err:
                 _LOGGER.exception(
                     "Authentication failed for %s:%s - check auth code",
@@ -283,6 +255,53 @@ class BarcoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 except (BarcoConnectionError, OSError):
                     _LOGGER.debug("Error during connection cleanup", exc_info=True)
                 raise UpdateFailed(f"Unexpected error: {err}") from err
+
+    async def _fetch_data(self) -> dict[str, Any]:
+        """Fetch data from projector (internal method wrapped by timeout)."""
+        # Enforce rate limiting
+        await self._enforce_rate_limit()
+
+        # Get system state (always available)
+        state = await self.device.get_state()
+        data: dict[str, Any] = {"state": state}
+
+        # Get device info properties (always available)
+        info = await self._get_info_properties()
+        data.update(info)
+
+        # If projector is active, get additional properties
+        if state in POWER_STATES_ACTIVE:
+            active_data = await self._get_active_properties()
+            data.update(active_data)
+
+        # Update polling interval based on current state
+        try:
+            power_state = PowerState(state)
+            new_interval = POLLING_INTERVALS.get(power_state, DEFAULT_POLLING_INTERVAL)
+        except ValueError:
+            # Invalid state string, use default
+            new_interval = DEFAULT_POLLING_INTERVAL
+
+        if self.update_interval != new_interval:
+            self.update_interval = new_interval
+            _LOGGER.debug(
+                "Updated polling interval to %s for state %s",
+                new_interval,
+                state,
+            )
+
+        _LOGGER.debug("Updated data: %s", data)
+
+        # Close connection after successful update to prevent leaks
+        # Connection will be re-established on next update
+        if CLOSE_CONNECTION_AFTER_UPDATE:
+            try:
+                await self.device.disconnect()
+                _LOGGER.debug("Closed connection after update")
+            except (BarcoConnectionError, OSError) as err:
+                _LOGGER.debug("Error closing connection: %s", err)
+
+        return data
 
     @property
     def unique_id(self) -> str:
