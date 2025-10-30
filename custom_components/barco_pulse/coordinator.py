@@ -60,10 +60,11 @@ class BarcoDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._update_lock = asyncio.Lock()
         self._last_update = 0.0
         # Generate stable fallback ID immediately (never None)
-        # SHA256 for stable device identifier generation (not for security)
-        self._fallback_id = hashlib.sha256(
-            f"{device.host}:{device.port}".encode()
-        ).hexdigest()[:16]
+        # Use blake2b for non-cryptographic hashing (faster than SHA256)
+        self._fallback_id = hashlib.blake2b(
+            f"{device.host}:{device.port}".encode(),
+            digest_size=8,
+        ).hexdigest()
 
     async def _enforce_rate_limit(self) -> None:
         """Enforce minimum interval between updates to prevent overwhelming device."""

@@ -40,7 +40,19 @@ class BarcoEntity(CoordinatorEntity[BarcoDataUpdateCoordinator]):
 
 
 class BarcoPowerMixin:
-    """Mixin for entities that support power on/off commands."""
+    """
+    Mixin for entities that support power on/off commands.
+
+    This mixin expects to be used with BarcoEntity (or another class that provides
+    a coordinator attribute). Classes using this mixin must have a coordinator
+    attribute of type BarcoDataUpdateCoordinator.
+
+    Attributes:
+        coordinator: The BarcoDataUpdateCoordinator instance provided by the base
+                     class (typically BarcoEntity). Used to access the device API
+                     and trigger state refreshes after power operations.
+
+    """
 
     coordinator: BarcoDataUpdateCoordinator
 
