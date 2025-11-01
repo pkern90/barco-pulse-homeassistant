@@ -24,6 +24,7 @@ _LOGGER = logging.getLogger(__name__)
 # JSON-RPC error codes
 ERROR_PROPERTY_NOT_FOUND = -32601
 ERROR_DEVICE_BUSY = -32009  # Device busy transitioning states
+ERROR_METHOD_NOT_AVAILABLE = -32000  # Method/interface not available in current state
 
 # Rate limiting and buffer constants
 MIN_REQUEST_INTERVAL = 0.1  # Minimum seconds between requests (100ms)
@@ -298,6 +299,12 @@ class BarcoDevice:
             # This is expected during power on/off transitions
             if code == ERROR_DEVICE_BUSY:
                 _LOGGER.debug("Device busy: %s", message)
+                raise BarcoStateError(message)
+
+            # Error -32000 indicates method/interface not available
+            # This occurs when APIs are not exposed in the current state
+            if code == ERROR_METHOD_NOT_AVAILABLE:
+                _LOGGER.debug("Method not available in current state: %s", message)
                 raise BarcoStateError(message)
 
             raise BarcoApiError(code, message)
